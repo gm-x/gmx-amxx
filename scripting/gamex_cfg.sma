@@ -16,19 +16,22 @@ enum _:REQUEST {
 	R_PARAM,
 }
 
-new Array:g_Requests;
-
-new JSON:g_Cfg;
+new Array:g_Requests = Invalid_Array;
+new JSON:g_Cfg = Invalid_JSON;
 
 public plugin_init() {
 	register_plugin("GameX Config", "0.1", "F@nt0M");
 	register_srvcmd("test", "CmdTest");
-
-	g_Requests = ArrayCreate(REQUEST);
 }
 
 public plugin_end() {
-	ArrayDestroy(g_Requests);
+	if (g_Requests != Invalid_Array) {
+		ArrayDestroy(g_Requests);
+	}
+
+	if (g_Cfg != Invalid_JSON) {
+		json_free(g_Cfg);
+	}
 }
 
 public CmdTest() {
@@ -42,21 +45,21 @@ public Test(&JSON:data, const param) {
 	server_print("^t PARAM %d param", param);
 }
 
-// public plugin_cfg() {
-// 	new filePath[128];
-// 	get_localinfo("amx_configsdir", filePath, charsmax(filePath));
-// 	add(filePath, charsmax(filePath), "/gamex.json");
-// 	g_Cfg = json_parse(filePath, true, true);
-// 	if (!json_is_object(g_Cfg)) {
-// 		set_fail_state("Coudn't open %s", filePath);
-// 		return;
-// 	}
+public plugin_cfg() {
+	new filePath[128];
+	get_localinfo("amxx_configsdir", filePath, charsmax(filePath));
+	add(filePath, charsmax(filePath), "/gamex.json");
+	g_Cfg = json_parse(filePath, true, true);
+	if (!json_is_object(g_Cfg)) {
+		set_fail_state("Coudn't open %s", filePath);
+		return;
+	}
 
-// 	new fwd = CreateMultiForward("GamexCfgLoaded", ET_IGNORE);
-// 	new ret;
-// 	ExecuteForward(fwd, ret);
-// 	DestroyForward(fwd);
-// }
+	new fwd = CreateMultiForward("GamexCfgLoaded", ET_IGNORE);
+	new ret;
+	ExecuteForward(fwd, ret);
+	DestroyForward(fwd);
+}
 
 public plugin_natives() {
 	register_native("GamexCfgGetKey", "NativeGamexCfgGetKey", 0);
@@ -188,6 +191,9 @@ makeRequest(const url[], &JSON:data, const pluginId, const funcId, const param) 
 	request[R_FUNC] = funcId;
 	request[R_PARAM] = param;
 
+	if (g_Requests == Invalid_Array) {
+		g_Requests = ArrayCreate(REQUEST);
+	}
 	new requestId = ArrayPushArray(g_Requests, request, sizeof request);
 
 	curl_thread_exec(ch, "OnExecComplete", requestId);
@@ -201,13 +207,23 @@ public OnExecComplete(Handle:ch, CURLcode:code, const response[], const param) {
 	curl_destroy_slist(request[R_SLIST]);
 	json_free(request[R_DATA]);
 
+	if (code != CURLE_OK) {
+		callCallback(request[R_PLUGIN], request[R_FUNC], 0, Invalid_JSON, request[R_PARAM]);
+	}
 	new JSON:data = json_parse(response);
-
-	if (callfunc_begin_i(request[R_FUNC], request[R_PLUGIN]) == 1) {
-		callfunc_push_intrf(_:data);
-		callfunc_push_int(request[R_PARAM]);
-		callfunc_end();
+	if (!json_object_has_value(data, "success", JSONBoolean) || !json_object_get_bool(data, "success") || !json_object_has_value(data, "data")) {
+		callCallback(request[R_PLUGIN], request[R_FUNC], 0, Invalid_JSON, request[R_PARAM]);
 	}
 
+	callCallback(request[R_PLUGIN], request[R_FUNC], 0, json_object_get_value(data, "data"), request[R_PARAM]);
 	json_free(data);
+}
+
+callCallback(const pluginId, const funcId, const status, const JSON:data, const param) {
+	if (callfunc_begin_i(funcId, pluginId) == 1) {
+		callfunc_push_int(status);
+		callfunc_push_int(_:data);
+		callfunc_push_int(param);
+		callfunc_end();
+	}
 }
