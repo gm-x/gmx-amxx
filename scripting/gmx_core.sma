@@ -16,7 +16,7 @@ new g_Token[65], g_Url[128], g_Retries;
 new g_RequestsNum = 0;
 
 public plugin_init() {
-	register_plugin("GameX Config", "0.1", "F@nt0M");
+	register_plugin("GMX Core", "0.0.2", "F@nt0M");
 }
 
 public plugin_end() {
