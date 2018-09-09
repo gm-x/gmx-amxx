@@ -2,43 +2,30 @@
 #include <curl>
 #include <json>
 
-#define URL "http://127.0.0.1:8000/api"
-#define JWT "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzUxMiJ9.eyJzZXJ2ZXJfaWQiOjF9.02FWNinIulC8QEoJ4yqMZs5p2ytd12_JMoIk8x7JxELINfajoebFISwTLMEaneLIcmt39pJ-hFyc9oVdJcnD8A"
-
 native JSON:GamexCfgGetKey(const key[]);
 native GamexMakeRequest(const endpoint[], &JSON:data, const callback[], const param = 0);
 
 enum _:REQUEST {
-	JSON:R_DATA,
+	R_ID,
 	Handle:R_SLIST,
 	R_PLUGIN,
 	R_FUNC,
 	R_PARAM,
+	R_RETRY
 }
 
 new Array:g_Requests = Invalid_Array;
-new JSON:g_Cfg = Invalid_JSON;
+new g_Token[65], g_Url[128], g_Retries;
+new g_RequestsNum = 0;
 
 public plugin_init() {
 	register_plugin("GameX Config", "0.1", "F@nt0M");
 	register_srvcmd("test", "CmdTest");
 }
 
-stock reverseString(string[]) {
-	for (new i = 0, len = strlen(string) - 1; i < len; i++, len--) {
-		string[i] ^= string[len];
-		string[len] ^= string[i];
-		string[i] ^= string[len];
-	}
-}
-
 public plugin_end() {
 	if (g_Requests != Invalid_Array) {
 		ArrayDestroy(g_Requests);
-	}
-
-	if (g_Cfg != Invalid_JSON) {
-		json_free(g_Cfg);
 	}
 }
 
@@ -46,22 +33,29 @@ public CmdTest() {
 	new JSON:data = json_init_object();
 	json_object_set_string(data, "steamid", "STEAM_0:1:160867035");
 	json_object_set_string(data, "nick", "F@nt0M");
-	GamexMakeRequest("player", data, "Test", 1);
+	GamexMakeRequest("server/info", data, "Test", 1);
 }
 
-public Test(&JSON:data, const param) {
-	server_print("^t PARAM %d param", param);
+public Test(const status, &JSON:data, const param) {
+	server_print("^t STATUS %d, PARAM %d param", status, param);
 }
 
 public plugin_cfg() {
 	new filePath[128];
 	get_localinfo("amxx_configsdir", filePath, charsmax(filePath));
-	add(filePath, charsmax(filePath), "/gamex.json");
-	g_Cfg = json_parse(filePath, true, true);
-	if (!json_is_object(g_Cfg)) {
+	add(filePath, charsmax(filePath), "/gmx.json");
+	new JSON:cfg = json_parse(filePath, true, true);
+	if (cfg == Invalid_JSON || !json_is_object(cfg)) {
+		json_free(cfg);
 		set_fail_state("Coudn't open %s", filePath);
 		return;
 	}
+
+	json_object_get_string(cfg, "token", g_Token, charsmax(g_Token));
+	json_object_get_string(cfg, "url", g_Url, charsmax(g_Url));
+	g_Retries = json_object_get_number(cfg, "retries");
+
+	json_free(cfg);
 
 	new fwd = CreateMultiForward("GamexCfgLoaded", ET_IGNORE);
 	new ret;
@@ -70,18 +64,7 @@ public plugin_cfg() {
 }
 
 public plugin_natives() {
-	register_native("GamexCfgGetKey", "NativeGamexCfgGetKey", 0);
 	register_native("GamexMakeRequest", "NativeGamexMakeRequest", 0);
-}
-
-public NativeGamexCfgGetKey(pluginId, paramNums) {
-	if (paramNums != 1) {
-		return _:Invalid_JSON;
-	}
-
-	new key[32];
-	get_string(1, key, charsmax(key));
-	return _:json_object_get_value(g_Cfg, key, false);
 }
 
 public NativeGamexMakeRequest(pluginId, paramNums) {
@@ -91,7 +74,7 @@ public NativeGamexMakeRequest(pluginId, paramNums) {
 
 	new endpoint[128];
 	get_string(1, endpoint, charsmax(endpoint));
-	format(endpoint, charsmax(endpoint), "%s/%s", URL, endpoint);
+	format(endpoint, charsmax(endpoint), "%s/api/%s", g_Url, endpoint);
 
 	new JSON:data = JSON:get_param_byref(2);
 
@@ -107,124 +90,120 @@ public NativeGamexMakeRequest(pluginId, paramNums) {
 	return makeRequest(endpoint, data, pluginId, funcId, param);
 }
 
+#define makeRequestCheckCode() \
+	if (code != CURLE_OK) { \
+		clearRequest(ch, slist); \
+		return 0; \
+	}
 makeRequest(const url[], &JSON:data, const pluginId, const funcId, const param) {
 	new request[REQUEST];
 
 	new CURLcode:code = CURLE_OK;
+	new Handle:slist = INVALID;
 
 	new Handle:ch = curl_init();
 	if (ch == INVALID) {
-		json_free(data);
 		return 0;
 	}
 
 	code = curl_setopt_string(ch, CURLOPT_URL, url)
-	if (code != CURLE_OK) {
-		json_free(data);
-		curl_close(ch);
-		return 0;
-	}
+	makeRequestCheckCode()
 
 	code = curl_setopt_cell(ch, CURLOPT_CONNECTTIMEOUT, 15)
-	if (code != CURLE_OK) {
-		json_free(data);
-		curl_close(ch);
-		return 0;
-	}
-
+	makeRequestCheckCode()
 
 	code = curl_setopt_cell(ch, CURLOPT_TIMEOUT, 15)
-	if (code != CURLE_OK) {
-		json_free(data);
-		curl_close(ch);
-		return 0;
-	}
+	makeRequestCheckCode()
 
 	code = curl_setopt_cell(ch, CURLOPT_POST, 1);
-	if (code != CURLE_OK) {
-		json_free(data);
-		curl_close(ch);
-		return 0;
-	}
+	makeRequestCheckCode()
 
 	code = curl_setopt_cell(ch, CURLOPT_HTTPAUTH, 1)
-	if (code != CURLE_OK) {
-		json_free(data);
-		curl_close(ch);
-		return 0;
-	}
-
-
-	code = curl_setopt_string(ch, CURLOPT_USERPWD, JWT)
-	if (code != CURLE_OK) {
-		json_free(data);
-		curl_close(ch);
-		return 0;
-	}
+	makeRequestCheckCode()
 
 	new post[2048];
 	json_serial_to_string(data, post, charsmax(post), false);
 	code = curl_setopt_string(ch, CURLOPT_POSTFIELDS, post);
-	if (code != CURLE_OK) {
-		json_free(data);
-		curl_close(ch);
-		return 0;
-	}
+	makeRequestCheckCode()
 
-	new Handle:slist = curl_create_slist();
+	slist = curl_create_slist();
 	if (slist == INVALID) {
-		json_free(data);
-		curl_close(ch);
+		clearRequest(ch, slist);
 		return 0;
 	}
 
 	if (!curl_slist_append(slist, "Content-Type: application/json")) {
-		curl_close(slist);
-		json_free(data);
-		curl_close(ch);
+		clearRequest(ch, slist);
+		return 0;
+	}
+
+	new token[128];
+	formatex(token, charsmax(token), "Authorization: Token %s", g_Token);
+	if (!curl_slist_append(slist, token)) {
+		clearRequest(ch, slist);
 		return 0;
 	}
 
 	code = curl_setopt_handle(ch, CURLOPT_HTTPHEADER, slist);
-	if (code != CURLE_OK) {
-		curl_close(slist);
-		json_free(data);
-		curl_close(ch);
-		return 0;
-	}
+	makeRequestCheckCode()
 
-	request[R_DATA] = data;
+	request[R_ID] = g_RequestsNum;
 	request[R_SLIST] = slist;
 	request[R_PLUGIN] = pluginId;
 	request[R_FUNC] = funcId;
 	request[R_PARAM] = param;
+	request[R_RETRY] = 0;
 
 	if (g_Requests == Invalid_Array) {
 		g_Requests = ArrayCreate(REQUEST);
 	}
-	new requestId = ArrayPushArray(g_Requests, request, sizeof request);
+	ArrayPushArray(g_Requests, request, sizeof request);
 
-	curl_thread_exec(ch, "OnExecComplete", requestId);
+	curl_thread_exec(ch, "OnExecComplete", g_RequestsNum);
+	g_RequestsNum++;
 	return 1;
 }
 
 public OnExecComplete(Handle:ch, CURLcode:code, const response[], const param) {
-	curl_close(ch);
 	new request[REQUEST];
-	ArrayGetArray(g_Requests, param, request, sizeof request);
-	curl_destroy_slist(request[R_SLIST]);
-	json_free(request[R_DATA]);
-
-	if (code != CURLE_OK) {
-		callCallback(request[R_PLUGIN], request[R_FUNC], 0, Invalid_JSON, request[R_PARAM]);
-	}
-	new JSON:data = json_parse(response);
-	if (!json_object_has_value(data, "success", JSONBoolean) || !json_object_get_bool(data, "success") || !json_object_has_value(data, "data")) {
-		callCallback(request[R_PLUGIN], request[R_FUNC], 0, Invalid_JSON, request[R_PARAM]);
+	new requestId = getRequest(param, request);
+	if (requestId == -1) {
+		curl_close(ch);
+		return;
 	}
 
-	callCallback(request[R_PLUGIN], request[R_FUNC], 0, json_object_get_value(data, "data"), request[R_PARAM]);
-	json_free(data);
+	new JSON:data = Invalid_JSON;
+	if (code == CURLE_OK) {
+		data = json_parse(response);
+	}
+
+	if (data != Invalid_JSON && json_object_has_value(data, "success", JSONBoolean) && json_object_get_bool(data, "success")) {
+		callCallback(request[R_PLUGIN], request[R_FUNC], 1, data, request[R_PARAM]);
+		clearRequest(ch, request[R_SLIST], requestId);
+		json_free(data);
+	} else if (++request[R_RETRY] >= g_Retries) {
+		callCallback(request[R_PLUGIN], request[R_FUNC], 0, Invalid_JSON, request[R_PARAM]);
+		clearRequest(ch, request[R_SLIST], requestId);
+		if (data != Invalid_JSON) {
+			json_free(data);
+		}
+	} else {
+		ArraySetArray(g_Requests, requestId, request, sizeof request);
+		curl_thread_exec(ch, "OnExecComplete", param);
+		if (data != Invalid_JSON) {
+			json_free(data);
+		}
+	}
+}
+
+getRequest(id, request[REQUEST]) {
+	for (new i = 0, n = ArraySize(g_Requests); i < n; i++) {
+		if (ArrayGetArray(g_Requests, i, request, sizeof request) && request[R_ID] == id) {
+			return i;
+		}
+	}
+
+	return -1;
 }
 
 callCallback(const pluginId, const funcId, const status, const JSON:data, const param) {
@@ -233,5 +212,16 @@ callCallback(const pluginId, const funcId, const status, const JSON:data, const 
 		callfunc_push_int(_:data);
 		callfunc_push_int(param);
 		callfunc_end();
+	}
+}
+
+clearRequest(const Handle:ch, const Handle:slist = INVALID, const requestId = -1) {
+	curl_close(ch);
+	if (ch != INVALID) {
+		curl_destroy_slist(slist);
+	}
+	
+	if (requestId >= 0) {
+		ArrayDeleteItem(g_Requests, requestId);
 	}
 }
