@@ -2,9 +2,6 @@
 #include <curl>
 #include <json>
 
-native JSON:GamexCfgGetKey(const key[]);
-native GamexMakeRequest(const endpoint[], &JSON:data, const callback[], const param = 0);
-
 enum _:REQUEST {
 	R_ID,
 	Handle:R_SLIST,
@@ -20,24 +17,12 @@ new g_RequestsNum = 0;
 
 public plugin_init() {
 	register_plugin("GameX Config", "0.1", "F@nt0M");
-	register_srvcmd("test", "CmdTest");
 }
 
 public plugin_end() {
 	if (g_Requests != Invalid_Array) {
 		ArrayDestroy(g_Requests);
 	}
-}
-
-public CmdTest() {
-	new JSON:data = json_init_object();
-	json_object_set_string(data, "steamid", "STEAM_0:1:160867035");
-	json_object_set_string(data, "nick", "F@nt0M");
-	GamexMakeRequest("server/info", data, "Test", 1);
-}
-
-public Test(const status, &JSON:data, const param) {
-	server_print("^t STATUS %d, PARAM %d param", status, param);
 }
 
 public plugin_cfg() {
