@@ -24,6 +24,14 @@ public plugin_init() {
 	register_srvcmd("test", "CmdTest");
 }
 
+stock reverseString(string[]) {
+	for (new i = 0, len = strlen(string) - 1; i < len; i++, len--) {
+		string[i] ^= string[len];
+		string[len] ^= string[i];
+		string[i] ^= string[len];
+	}
+}
+
 public plugin_end() {
 	if (g_Requests != Invalid_Array) {
 		ArrayDestroy(g_Requests);
