@@ -2,6 +2,7 @@
 #include <reapi>
 #include <curl>
 #include <json>
+#include <PersistentDataStorage>
 #include "includes/gmx.inc"
 
 enum FWD {
@@ -14,7 +15,7 @@ new g_Forwards[FWD];
 new g_Return;
 
 enum {
-	STATUS_NONE,
+	STATUS_NONE = 0,
 	STATUS_LOADING,
 	STATUS_LOADED,
 };
@@ -22,7 +23,8 @@ enum {
 enum _:PLAYER {
 	PL_STATUS,
 	PL_ID,
-	PL_USER_ID
+	PL_USER_ID,
+	PL_SRV_USR_ID,
 };
 new g_Players[MAX_PLAYERS + 1][PLAYER];
 
@@ -71,22 +73,23 @@ public client_authorized(id) {
 }
 
 public SV_DropClient_Post(const id) {
-	g_Players[id][PL_STATUS] = STATUS_NONE;
-
 	if (g_Players[id][PL_STATUS] != STATUS_LOADED || g_Players[id][PL_ID] <= 0) {
+		arrayset(g_Players[id], 0, sizeof g_Players[]);
 		return HC_CONTINUE;
 	}
 
+	g_Players[id][PL_STATUS] = STATUS_NONE;
 	ExecuteForward(g_Forwards[FWD_Disconnecting], g_Return, id);
 	if (g_Return == PLUGIN_HANDLED) {
+		arrayset(g_Players[id], 0, sizeof g_Players[]);
 		return HC_CONTINUE;
 	}
 
 	new JSON:data = json_init_object();
 	json_object_set_number(data, "id", g_Players[id][PL_ID]);
-	GamexMakeRequest("player/connect", data, "OnDisconnected", get_user_userid(id));
+	GamexMakeRequest("player/disconnect", data, "OnDisconnected", get_user_userid(id));
 	json_free(data);
-
+	arrayset(g_Players[id], 0, sizeof g_Players[]);
 	return HC_CONTINUE;
 }
 
@@ -96,13 +99,13 @@ public OnConnected(const status, JSON:data, const userid) {
 		return;
 	}
 
-	new id = GMXGetUserByUserID(userid);
+	new id = getUserByUserID(userid);
 	if (id == 0) {
 		server_print("User #%d not found", userid);
 		return;
 	}
 
-	if (!json_is_object(data) || !json_object_has_value(data, "player", JSONObject)) {
+	if (!json_is_object(data)) {
 		server_print("Bad response");
 		return;
 	}
@@ -110,14 +113,14 @@ public OnConnected(const status, JSON:data, const userid) {
 	new JSON:tmp;
 	if (json_object_has_value(data, "player", JSONObject)) {
 		tmp = json_object_get_value(data, "player");
-		g_Players[id][PL_ID] = json_object_has_value(data, "id", JSONNumber)
+		g_Players[id][PL_ID] = json_object_has_value(tmp, "id", JSONNumber)
 			? json_object_get_number(tmp, "id")
 			: 0;
 		json_free(tmp);
 	}
 	if (json_object_has_value(data, "user", JSONObject)) {
 		tmp = json_object_get_value(data, "user");
-		g_Players[id][PL_USER_ID] = json_object_has_value(data, "id", JSONNumber)
+		g_Players[id][PL_USER_ID] = json_object_has_value(tmp, "id", JSONNumber)
 			? json_object_get_number(tmp, "id")
 			: 0;
 		json_free(tmp);
@@ -129,7 +132,29 @@ public OnConnected(const status, JSON:data, const userid) {
 
 public OnDisconnected(const status, JSON:data, const userid) {
 	if (status != GMX_REQ_STATUS_OK) {
-		server_print("Error load player #%d", userid);
+		server_print("Error saving player #%d", userid);
 		return;
 	}
+}
+
+public PDS_Save() {
+	for (new id = 1, key[32], data[2]; id <= MaxClients; id++) {
+		if (g_Players[id][PL_STATUS] == STATUS_LOADED && g_Players[id][PL_ID] > 0) {
+			formatex(key, charsmax(key), "gmx_pl_%d", get_user_userid(id));
+			data[0] = g_Players[id][PL_ID];
+			data[1] = g_Players[id][PL_USER_ID];
+			PDS_SetArray(key, data, sizeof data);
+		}
+	}
+	
+}
+
+stock getUserByUserID(const userid) {
+	for (new id = 1; id <= MaxClients; id++) {
+		if ((is_user_connected(id) || is_user_connecting(id)) || get_user_userid(id) == userid) {
+			return id;
+		}
+	}
+
+	return 0;
 }
