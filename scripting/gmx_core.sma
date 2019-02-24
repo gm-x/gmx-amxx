@@ -12,20 +12,7 @@ new Token[65], Url[256];
 new GripRequestOptions:RequestOptions = Empty_GripRequestOptions;
 new Array:Requests = Invalid_Array, Request[REQUEST];
 
-public plugin_init() {
-	register_plugin("GMX Core", "0.0.3", "F@nt0M");
-}
-
-public plugin_end() {
-	if (Requests != Invalid_Array) {
-		ArrayDestroy(Requests);
-	}
-	if (RequestOptions != Empty_GripRequestOptions) {
-		grip_destroy_options(RequestOptions);
-	}
-}
-
-public plugin_cfg() {
+public plugin_precache() {
 	new filePath[128];
 	get_localinfo("amxx_configsdir", filePath, charsmax(filePath));
 	add(filePath, charsmax(filePath), "/gmx.json");
@@ -47,27 +34,42 @@ public plugin_cfg() {
 	DestroyForward(fwd);
 }
 
+public plugin_init() {
+	register_plugin("GMX Core", "0.0.3", "F@nt0M");
+}
+
+public plugin_end() {
+	if (Requests != Invalid_Array) {
+		ArrayDestroy(Requests);
+	}
+	if (RequestOptions != Empty_GripRequestOptions) {
+		grip_destroy_options(RequestOptions);
+	}
+}
+
 public plugin_natives() {
 	register_native("GamexMakeRequest", "NativeGamexMakeRequest", 0);
 }
 
 public NativeGamexMakeRequest(pluginId, paramNums) {
+
+	enum { arg_endpoint = 1, arg_data, arg_callback, arg_param };
 	if (paramNums < 3) {
 		return 0;
 	}
 
 	new endpoint[128];
-	get_string(1, endpoint, charsmax(endpoint));
+	get_string(arg_endpoint, endpoint, charsmax(endpoint));
 
-	new JSON:data = JSON:get_param_byref(2);
+	new JSON:data = JSON:get_param(arg_data);
 	new callback[64];
-	get_string(3, callback, charsmax(callback));
+	get_string(arg_callback, callback, charsmax(callback));
 	new funcId = get_func_id(callback, pluginId);
 	if (funcId == -1) {
 		return -1;
 	}
 
-	return makeRequest(endpoint, data, pluginId, funcId, paramNums >= 4 ? get_param(4) : 0);
+	return makeRequest(endpoint, data, pluginId, funcId, paramNums >= 4 ? get_param(arg_param) : 0);
 }
 
 makeRequest(const endpoint[], JSON:data, const pluginId, const funcId, const param) {
@@ -89,35 +91,42 @@ makeRequest(const endpoint[], JSON:data, const pluginId, const funcId, const par
 
 	new GripBody:body = getBody(data);
 	grip_request(fmt("%s/api/%s", Url, endpoint), body, GripRequestTypePost, "RequestHandler", RequestOptions, id);
-	grip_destroy_body(body);
+	if (body != Empty_GripBody) {
+		grip_destroy_body(body);
+	}
 	return id;
 }
 
 public RequestHandler(const id) {
-	if (grip_get_response_state() != GripResponseStateSuccessful) {
-		return;
-	}
-
 	if (id < 0 || id >= ArraySize(Requests)) {
 		return;
 	}
 
+	if (grip_get_response_state() != GripResponseStateSuccessful) {
+		callCallback(Request[RequestPluginId], Request[RequestFuncId], 0, Invalid_JSON, Request[RequestParam]);
+		return;
+	}
+
+	if (grip_get_response_status_code() != GripHTTPStatusOk) {
+		callCallback(Request[RequestPluginId], Request[RequestFuncId], 0, Invalid_JSON, Request[RequestParam]);
+		return;
+	}
+
 	ArrayGetArray(Requests, id, Request, sizeof Request);
-
-	new JSON:data = Invalid_JSON;
-
 	new body[2000];
 	grip_get_response_body_string(body, charsmax(body));
-	data = json_parse(body);
+	new JSON:data = json_parse(body);
 
-	// TODO: Add retry
-	if (data != Invalid_JSON && json_object_has_value(data, "success", JSONBoolean) && json_object_get_bool(data, "success")) {
-		callCallback(Request[RequestPluginId], Request[RequestFuncId], 1, data, Request[RequestParam]);
+	callCallback(Request[RequestPluginId], Request[RequestFuncId], data != Invalid_JSON ? 1 : 0, data, Request[RequestParam]);
+	if (data != Invalid_JSON) {
 		json_free(data);
 	}
 }
 
 GripBody:getBody(const JSON:json) {
+	if (json == Invalid_JSON) {
+		return Empty_GripBody;
+	}
 	new data[2000];
 	json_serial_to_string(json, data, charsmax(data));
 	return grip_body_from_string(data);
