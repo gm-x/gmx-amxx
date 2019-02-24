@@ -2,6 +2,12 @@
 #include <json>
 #include <grip>
 
+#define CHECK_NATIVE_ARGS_NUM(%1,%2) \
+	if (%1 < %2) { \
+		log_error(AMX_ERR_NATIVE, "Invalid num of arguments %d. Expected %d", %1, %2); \
+		return 0; \
+	}
+
 enum _:REQUEST {
 	RequestPluginId,
 	RequestFuncId,
@@ -35,7 +41,7 @@ public plugin_precache() {
 }
 
 public plugin_init() {
-	register_plugin("GMX Core", "0.0.3", "F@nt0M");
+	register_plugin("GMX Core", "0.0.4", "F@nt0M");
 }
 
 public plugin_end() {
@@ -51,12 +57,10 @@ public plugin_natives() {
 	register_native("GamexMakeRequest", "NativeGamexMakeRequest", 0);
 }
 
-public NativeGamexMakeRequest(pluginId, paramNums) {
+public NativeGamexMakeRequest(plugin, argc) {
+	CHECK_NATIVE_ARGS_NUM(argc, 3)
 
 	enum { arg_endpoint = 1, arg_data, arg_callback, arg_param };
-	if (paramNums < 3) {
-		return 0;
-	}
 
 	new endpoint[128];
 	get_string(arg_endpoint, endpoint, charsmax(endpoint));
@@ -64,12 +68,12 @@ public NativeGamexMakeRequest(pluginId, paramNums) {
 	new JSON:data = JSON:get_param(arg_data);
 	new callback[64];
 	get_string(arg_callback, callback, charsmax(callback));
-	new funcId = get_func_id(callback, pluginId);
+	new funcId = get_func_id(callback, plugin);
 	if (funcId == -1) {
 		return -1;
 	}
 
-	return makeRequest(endpoint, data, pluginId, funcId, paramNums >= 4 ? get_param(arg_param) : 0);
+	return makeRequest(endpoint, data, plugin, funcId, argc >= 4 ? get_param(arg_param) : 0);
 }
 
 makeRequest(const endpoint[], JSON:data, const pluginId, const funcId, const param) {
