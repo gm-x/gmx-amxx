@@ -103,15 +103,18 @@ makeRequest(const endpoint[], JSON:data, const pluginId, const funcId, const par
 
 public RequestHandler(const id) {
 	if (id < 0 || id >= ArraySize(Requests)) {
+		log_amx("Bad request id %d", id);
 		return;
 	}
 
 	if (grip_get_response_state() != GripResponseStateSuccessful) {
+		log_amx("Request state is %d", grip_get_response_state());
 		callCallback(Request[RequestPluginId], Request[RequestFuncId], 0, Invalid_JSON, Request[RequestParam]);
 		return;
 	}
 
 	if (grip_get_response_status_code() != GripHTTPStatusOk) {
+		log_amx("Request status code is %d", grip_get_response_status_code());
 		callCallback(Request[RequestPluginId], Request[RequestFuncId], 0, Invalid_JSON, Request[RequestParam]);
 		return;
 	}

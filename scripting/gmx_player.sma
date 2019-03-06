@@ -1,7 +1,7 @@
 #include <amxmodx>
 #include <reapi>
 #include <json>
-#include <PersistentDataStorage>
+// #include <PersistentDataStorage>
 #include "includes/gmx.inc"
 
 enum FWD {
@@ -24,7 +24,7 @@ enum _:PLAYER {
 	PlayerStatus,
 	PlayerId,
 	PlayerUserId,
-	PplayerServerUserId,
+	PlayerSessionId,
 };
 new Players[MAX_PLAYERS + 1][PLAYER];
 
@@ -69,6 +69,7 @@ public client_authorized(id) {
 	json_object_set_string(data, "steamid", steamid);
 	json_object_set_string(data, "nick", nick);
 	json_object_set_string(data, "ip", ip);
+	
 	GamexMakeRequest("player/connect", data, "OnConnected", get_user_userid(id));
 	json_free(data);
 	return PLUGIN_CONTINUE;
@@ -160,7 +161,7 @@ public OnDisconnected(const status, JSON:data, const userid) {
 
 stock getUserByUserID(const userid) {
 	for (new id = 1; id <= MaxClients; id++) {
-		if ((is_user_connected(id) || is_user_connecting(id)) || get_user_userid(id) == userid) {
+		if ((is_user_connected(id) || is_user_connecting(id)) && get_user_userid(id) == userid) {
 			return id;
 		}
 	}
