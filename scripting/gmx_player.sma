@@ -37,6 +37,8 @@ public plugin_init() {
 	g_Forwards[FWD_Loadeded] = CreateMultiForward("GMX_PlayerLoaded", ET_IGNORE, FP_CELL, FP_CELL, FP_CELL);
 	g_Forwards[FWD_Disconnecting] = CreateMultiForward("GMX_PlayerDisconnecting", ET_IGNORE, FP_CELL);
 	g_Forwards[FWD_Disconnected] = CreateMultiForward("GMX_PlayerDisconnected", ET_IGNORE, FP_CELL);
+
+	register_clcmd("gmx_assign", "CmdAssing");
 }
 
 public plugin_end() {
@@ -45,11 +47,15 @@ public plugin_end() {
 	DestroyForward(g_Forwards[FWD_Disconnecting]);
 }
 
-public client_authorized(id) {
+public UAC_Checked(const id) {
+	if (is_user_bot(id) || is_user_hltv(id)) {
+		return;
+	}
+
 	arrayset(Players[id], 0, sizeof Players[]);
 	ExecuteForward(g_Forwards[FWD_Loadeding], g_Return, id);
 	if (g_Return == PLUGIN_HANDLED) {
-		return PLUGIN_CONTINUE;
+		return;
 	}
 
 	Players[id][PlayerStatus] = STATUS_LOADING;
@@ -72,7 +78,6 @@ public client_authorized(id) {
 	
 	GamexMakeRequest("player/connect", data, "OnConnected", get_user_userid(id));
 	json_free(data);
-	return PLUGIN_CONTINUE;
 }
 
 public SV_DropClient_Post(const id) {
@@ -96,6 +101,17 @@ public SV_DropClient_Post(const id) {
 	return HC_CONTINUE;
 }
 
+public CmdAssing(id) {
+	new token[36];
+	read_args(token, charsmax(token));
+	remove_quotes(token);
+	new JSON:data = json_init_object();
+	json_object_set_number(data, "id", Players[id][PlayerId]);
+	json_object_set_string(data, "token", token);
+	GamexMakeRequest("player/assign", data, "OnAssigned", get_user_userid(id));
+	json_free(data);
+}
+
 public OnConnected(const status, JSON:data, const userid) {
 	if (status != GMX_REQ_STATUS_OK) {
 		server_print("Error load player #%d", userid);
@@ -113,21 +129,26 @@ public OnConnected(const status, JSON:data, const userid) {
 		return;
 	}
 
-	new JSON:tmp;
-	if (json_object_has_value(data, "player", JSONObject)) {
-		tmp = json_object_get_value(data, "player");
-		Players[id][PlayerId] = json_object_has_value(tmp, "id", JSONNumber)
-			? json_object_get_number(tmp, "id")
-			: 0;
-		json_free(tmp);
-	}
-	if (json_object_has_value(data, "user", JSONObject)) {
-		tmp = json_object_get_value(data, "user");
-		Players[id][PlayerUserId] = json_object_has_value(tmp, "id", JSONNumber)
-			? json_object_get_number(tmp, "id")
-			: 0;
-		json_free(tmp);
-	}
+
+	Players[id][PlayerId] = json_object_has_value(data, "player_id", JSONNumber)
+		? json_object_get_number(data, "player_id")
+		: 0;
+
+	Players[id][PlayerSessionId] = json_object_has_value(data, "session_id", JSONNumber)
+		? json_object_get_number(data, "session_id")
+		: 0;
+
+	Players[id][PlayerUserId] = json_object_has_value(data, "user_id", JSONNumber)
+		? json_object_get_number(data, "user_id")
+		: 0;
+
+	// if (json_object_has_value(data, "user", JSONObject)) {
+	// 	new JSON:tmp = json_object_get_value(data, "user");
+	// 	Players[id][PlayerUserId] = json_object_has_value(tmp, "id", JSONNumber)
+	// 		? json_object_get_number(tmp, "id")
+	// 		: 0;
+	// 	json_free(tmp);
+	// }
 
 	Players[id][PlayerStatus] = STATUS_LOADED;
 	ExecuteForward(g_Forwards[FWD_Loadeded], g_Return, id, Players[id][PlayerId], data);
@@ -145,6 +166,28 @@ public OnDisconnected(const status, JSON:data, const userid) {
 		return;
 	}
 	ExecuteForward(g_Forwards[FWD_Loadeded], g_Return, FWD_Disconnected, id, Players[id][PlayerId], data);
+}
+
+public OnAssigned(const status, JSON:data, const userid) {
+	if (status != GMX_REQ_STATUS_OK) {
+		server_print("Error assign player #%d", userid);
+		return;
+	}
+
+	new id = getUserByUserID(userid);
+	if (id == 0) {
+		server_print("User #%d not found", userid);
+		return;
+	}
+
+	if (!json_is_object(data)) {
+		server_print("Bad response");
+		return;
+	}
+
+	Players[id][PlayerUserId] = json_object_has_value(data, "user_id", JSONNumber)
+		? json_object_get_number(data, "user_id")
+		: 0;
 }
 
 // public PDS_Save() {

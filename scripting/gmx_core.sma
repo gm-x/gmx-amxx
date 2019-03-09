@@ -2,6 +2,8 @@
 #include <json>
 #include <grip>
 
+#define MAX_DATA_LENGTH 6000
+
 #define CHECK_NATIVE_ARGS_NUM(%1,%2) \
 	if (%1 < %2) { \
 		log_error(AMX_ERR_NATIVE, "Invalid num of arguments %d. Expected %d", %1, %2); \
@@ -120,7 +122,7 @@ public RequestHandler(const id) {
 	}
 
 	ArrayGetArray(Requests, id, Request, sizeof Request);
-	new body[2000];
+	new body[MAX_DATA_LENGTH];
 	grip_get_response_body_string(body, charsmax(body));
 	new JSON:data = json_parse(body);
 
