@@ -4,6 +4,8 @@
 // #include <PersistentDataStorage>
 #include "includes/gmx.inc"
 
+new bool:UAC_IsLoaded = false;
+
 enum FWD {
 	FWD_Loadeding,
 	FWD_Loadeded,
@@ -47,11 +49,23 @@ public plugin_end() {
 	DestroyForward(g_Forwards[FWD_Disconnecting]);
 }
 
-public UAC_Checked(const id) {
-	if (is_user_bot(id) || is_user_hltv(id)) {
-		return;
+public client_putinserver(id) {
+	if (!UAC_IsLoaded && !is_user_bot(id) && !is_user_hltv(id)) {
+		loadPlayer(id);
 	}
+}
 
+public UAC_Loaded() {
+	UAC_IsLoaded = true;
+}
+
+public UAC_Checked(const id) {
+	if (!is_user_bot(id) && !is_user_hltv(id)) {
+		loadPlayer(id);
+	}
+}
+
+loadPlayer(id) {
 	arrayset(Players[id], 0, sizeof Players[]);
 	ExecuteForward(g_Forwards[FWD_Loadeding], g_Return, id);
 	if (g_Return == PLUGIN_HANDLED) {
