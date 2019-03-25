@@ -1,6 +1,7 @@
 #include <amxmodx>
 #include <reapi>
 #include <json>
+#include <PersistentDataStorage>
 #include <gmx>
 #include <uac>
 
@@ -27,6 +28,7 @@ enum _:PLAYER {
 	PlayerId,
 	PlayerUserId,
 	PlayerSessionId,
+	PlayerSteamId[32]
 };
 new Players[MAX_PLAYERS + 1][PLAYER];
 
@@ -49,10 +51,25 @@ public plugin_end() {
 	DestroyForward(g_Forwards[FWD_Disconnecting]);
 }
 
+public PDS_Save() {
+	for (new i = 1, data[2]; i < MaxClients; i++) {
+		if (Players[i][PlayerStatus] == STATUS_LOADED) {
+			data[0] = Players[i][PlayerId];
+			data[1] = Players[i][PlayerSessionId];
+			PDS_SetArray(Players[i][PlayerSteamId], data, sizeof data);
+		}
+	}
+}
+
+public client_connect(id) {
+	Players[id][PlayerStatus] = STATUS_NONE;
+}
+
 public client_putinserver(id) {
 	if (!UAC_IsLoaded && !is_user_bot(id) && !is_user_hltv(id)) {
 		loadPlayer(id);
 	}
+	get_user_authid(id, Players[id][PlayerSteamId], 31);
 }
 
 public UAC_Loaded() {
@@ -60,7 +77,7 @@ public UAC_Loaded() {
 }
 
 public UAC_Checked(const id, const UAC_CheckResult:result) {
-	if (result != UAC_CHECK_KICK && !is_user_bot(id) && !is_user_hltv(id)) {
+	if (result != UAC_CHECK_KICK && !is_user_bot(id) && !is_user_hltv(id) && Players[id][PlayerStatus] != STATUS_LOADED) {
 		loadPlayer(id);
 	}
 }
@@ -84,12 +101,20 @@ loadPlayer(id) {
 		: 0;
 
 	new JSON:data = json_init_object();
-	json_object_set_null(data, "id");
 	json_object_set_number(data, "emulator", emulator);
 	json_object_set_string(data, "steamid", steamid);
 	json_object_set_string(data, "nick", nick);
 	json_object_set_string(data, "ip", ip);
-	
+
+	new stored[2];
+	if (PDS_GetArray(steamid, stored, sizeof stored)) {
+		json_object_set_number(data, "id", stored[0]);
+		json_object_set_number(data, "session_id", stored[1]);
+	} else {
+		json_object_set_null(data, "id");
+		json_object_set_null(data, "session_id");
+	}
+
 	GamexMakeRequest("player/connect", data, "OnConnected", get_user_userid(id));
 	json_free(data);
 }
@@ -165,6 +190,12 @@ public OnConnected(const status, JSON:data, const userid) {
 	// }
 
 	Players[id][PlayerStatus] = STATUS_LOADED;
+
+	new stored[2];
+	stored[0] = Players[id][PlayerId];
+	stored[1] = Players[id][PlayerSessionId];
+	PDS_SetArray(Players[id][PlayerSteamId], stored, sizeof stored);
+
 	ExecuteForward(g_Forwards[FWD_Loadeded], g_Return, id, Players[id][PlayerId], data);
 }
 
@@ -174,12 +205,12 @@ public OnDisconnected(const status, JSON:data, const userid) {
 		return;
 	}
 
-	new id = getUserByUserID(userid);
-	if (id == 0) {
-		server_print("User #%d not found", userid);
-		return;
-	}
-	ExecuteForward(g_Forwards[FWD_Loadeded], g_Return, FWD_Disconnected, id, Players[id][PlayerId], data);
+	// new id = getUserByUserID(userid);
+	// if (id == 0) {
+	// 	server_print("User #%d not found", userid);
+	// 	return;
+	// }
+	// ExecuteForward(g_Forwards[FWD_Loadeded], g_Return, FWD_Disconnected, id, Players[id][PlayerId], data);
 }
 
 public OnAssigned(const status, JSON:data, const userid) {

@@ -179,6 +179,7 @@ GripBody:getBody(const JSON:json) {
 	}
 	new data[2000];
 	json_serial_to_string(json, data, charsmax(data));
+	logToFile(LOG_DEBUG, "Data: '%s'", data);
 	return grip_body_from_string(data);
 }
 
