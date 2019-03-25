@@ -1,8 +1,8 @@
 #include <amxmodx>
 #include <reapi>
 #include <json>
-// #include <PersistentDataStorage>
-#include "includes/gmx.inc"
+#include <gmx>
+#include <uac>
 
 new bool:UAC_IsLoaded = false;
 
@@ -59,8 +59,8 @@ public UAC_Loaded() {
 	UAC_IsLoaded = true;
 }
 
-public UAC_Checked(const id) {
-	if (!is_user_bot(id) && !is_user_hltv(id)) {
+public UAC_Checked(const id, const UAC_CheckResult:result) {
+	if (result != UAC_CHECK_KICK && !is_user_bot(id) && !is_user_hltv(id)) {
 		loadPlayer(id);
 	}
 }

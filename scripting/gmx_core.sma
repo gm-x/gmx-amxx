@@ -2,7 +2,7 @@
 #include <json>
 #include <grip>
 
-#define MAX_DATA_LENGTH 6000
+#define MAX_DATA_LENGTH 4000
 
 #define CHECK_NATIVE_ARGS_NUM(%1,%2) \
 	if (%1 < %2) { \
@@ -10,17 +10,39 @@
 		return 0; \
 	}
 
+enum LogLevel (+=1) {
+	LOG_CRITICAL = 0,
+	LOG_ERROR,
+	LOG_INFO,
+	LOG_DEBUG
+};
+
 enum _:REQUEST {
 	RequestPluginId,
 	RequestFuncId,
 	RequestParam,
-}
+};
 
-new Token[65], Url[256];
+new Token[65], Url[256], LogLevel:LogLvl;
+new LogFile;
 new GripRequestOptions:RequestOptions = Empty_GripRequestOptions;
 new Array:Requests = Invalid_Array, Request[REQUEST];
 
 public plugin_precache() {
+	new path[128];
+	get_localinfo("amxx_logs", path, charsmax(path));
+	add(path, charsmax(path), "/gmx");
+	if (!dir_exists(path)) {
+		mkdir(path);
+	}
+
+	add(path, charsmax(path), "/L%Y%m%d.log");
+	format_time(path, charsmax(path), path);
+	LogFile = fopen(path, "a");
+	if (!LogFile) {
+		set_fail_state("Could not open %s for write", path);
+	}
+
 	new filePath[128];
 	get_localinfo("amxx_configsdir", filePath, charsmax(filePath));
 	add(filePath, charsmax(filePath), "/gmx.json");
@@ -28,11 +50,13 @@ public plugin_precache() {
 	if (cfg == Invalid_JSON || !json_is_object(cfg)) {
 		json_free(cfg);
 		set_fail_state("Coudn't open %s", filePath);
-		return;
 	}
 
 	json_object_get_string(cfg, "token", Token, charsmax(Token));
 	json_object_get_string(cfg, "url", Url, charsmax(Url));
+	LogLvl = LogLevel:json_object_get_number(cfg, "loglevel");
+
+	logToFile(LOG_DEBUG, "Load configuration. URL is '%s'", Url);
 
 	json_free(cfg);
 
@@ -53,6 +77,8 @@ public plugin_end() {
 	if (RequestOptions != Empty_GripRequestOptions) {
 		grip_destroy_options(RequestOptions);
 	}
+
+	fclose(LogFile);
 }
 
 public plugin_natives() {
@@ -75,6 +101,8 @@ public NativeGamexMakeRequest(plugin, argc) {
 		return -1;
 	}
 
+	logToFile(LOG_DEBUG, "Call make request to '%s' with callback '%s'", endpoint, callback);
+
 	return makeRequest(endpoint, data, plugin, funcId, argc >= 4 ? get_param(arg_param) : 0);
 }
 
@@ -94,6 +122,7 @@ makeRequest(const endpoint[], JSON:data, const pluginId, const funcId, const par
 		Requests = ArrayCreate(REQUEST);
 	}
 	new id = ArrayPushArray(Requests, Request, sizeof Request);
+	logToFile(LOG_DEBUG, "Make request to '%s/api/%s'. Request ID %d", Url, endpoint, id);
 
 	new GripBody:body = getBody(data);
 	grip_request(fmt("%s/api/%s", Url, endpoint), body, GripRequestTypePost, "RequestHandler", RequestOptions, id);
@@ -105,18 +134,30 @@ makeRequest(const endpoint[], JSON:data, const pluginId, const funcId, const par
 
 public RequestHandler(const id) {
 	if (id < 0 || id >= ArraySize(Requests)) {
-		log_amx("Bad request id %d", id);
+		logToFile(LOG_ERROR, "Bad request id %d", id);
 		return;
 	}
 
 	if (grip_get_response_state() != GripResponseStateSuccessful) {
-		log_amx("Request state is %d", grip_get_response_state());
+		switch (grip_get_response_state()) {
+			case GripResponseStateCancelled: {
+				logToFile(LOG_INFO, "Request %d was cancaled", id);
+			}
+			case GripResponseStateError: {
+				new err[256];
+				grip_get_error_description(err, charsmax(err))
+				logToFile(LOG_ERROR, "Request %d finished with error: %s", id, err);
+			}
+			case GripResponseStateTimeout: {
+				logToFile(LOG_ERROR, "Request %d finished with timeout", id);
+			}
+		}
 		callCallback(Request[RequestPluginId], Request[RequestFuncId], 0, Invalid_JSON, Request[RequestParam]);
 		return;
 	}
 
 	if (grip_get_response_status_code() != GripHTTPStatusOk) {
-		log_amx("Request status code is %d", grip_get_response_status_code());
+		logToFile(LOG_INFO, "Request %d finished with %d status", id, grip_get_response_status_code());
 		callCallback(Request[RequestPluginId], Request[RequestFuncId], 0, Invalid_JSON, Request[RequestParam]);
 		return;
 	}
@@ -148,4 +189,21 @@ callCallback(const pluginId, const funcId, const status, const JSON:data, const 
 		callfunc_push_int(param);
 		callfunc_end();
 	}
+}
+
+logToFile(const LogLevel:level, const msg[], any:...) {
+	if (level > LogLvl) {
+		return;
+	}
+
+	new message[512];
+	vformat(message, charsmax(message), msg, 3);
+
+	new hour, minute, second;
+	time(hour, minute, second);
+
+	server_print("[GRIP] %02d:%02d:%02d: %s", hour, minute, second, message)
+	
+	fprintf(LogFile, "%02d:%02d:%02d: %s^n", hour, minute, second, message);
+	fflush(LogFile);
 }
