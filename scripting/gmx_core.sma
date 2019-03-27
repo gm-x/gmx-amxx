@@ -28,7 +28,9 @@ new LogFile;
 new GripRequestOptions:RequestOptions = Empty_GripRequestOptions;
 new Array:Requests = Invalid_Array, Request[REQUEST];
 
-public plugin_precache() {
+public plugin_init() {
+	register_plugin("GMX Core", "0.0.4", "F@nt0M");
+
 	new path[128];
 	get_localinfo("amxx_logs", path, charsmax(path));
 	add(path, charsmax(path), "/gmx");
@@ -64,10 +66,6 @@ public plugin_precache() {
 	new ret;
 	ExecuteForward(fwd, ret);
 	DestroyForward(fwd);
-}
-
-public plugin_init() {
-	register_plugin("GMX Core", "0.0.4", "F@nt0M");
 }
 
 public plugin_end() {
