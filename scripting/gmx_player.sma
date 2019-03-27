@@ -14,7 +14,7 @@ enum FWD {
 	FWD_Disconnected,
 }
 
-new g_Forwards[FWD];
+new Forwards[FWD];
 new g_Return;
 
 enum {
@@ -37,18 +37,18 @@ public plugin_init() {
 
 	RegisterHookChain(RH_SV_DropClient, "SV_DropClient_Post", true);
 
-	g_Forwards[FWD_Loadeding] = CreateMultiForward("GMX_PlayerLoading", ET_STOP, FP_CELL);
-	g_Forwards[FWD_Loadeded] = CreateMultiForward("GMX_PlayerLoaded", ET_IGNORE, FP_CELL, FP_CELL, FP_CELL);
-	g_Forwards[FWD_Disconnecting] = CreateMultiForward("GMX_PlayerDisconnecting", ET_IGNORE, FP_CELL);
-	g_Forwards[FWD_Disconnected] = CreateMultiForward("GMX_PlayerDisconnected", ET_IGNORE, FP_CELL);
+	Forwards[FWD_Loadeding] = CreateMultiForward("GMX_PlayerLoading", ET_STOP, FP_CELL);
+	Forwards[FWD_Loadeded] = CreateMultiForward("GMX_PlayerLoaded", ET_IGNORE, FP_CELL, FP_CELL, FP_CELL);
+	Forwards[FWD_Disconnecting] = CreateMultiForward("GMX_PlayerDisconnecting", ET_STOP, FP_CELL);
+	Forwards[FWD_Disconnected] = CreateMultiForward("GMX_PlayerDisconnected", ET_IGNORE, FP_CELL);
 
 	register_clcmd("gmx_assign", "CmdAssing");
 }
 
 public plugin_end() {
-	DestroyForward(g_Forwards[FWD_Loadeding]);
-	DestroyForward(g_Forwards[FWD_Loadeded]);
-	DestroyForward(g_Forwards[FWD_Disconnecting]);
+	DestroyForward(Forwards[FWD_Loadeding]);
+	DestroyForward(Forwards[FWD_Loadeded]);
+	DestroyForward(Forwards[FWD_Disconnecting]);
 }
 
 public PDS_Save() {
@@ -84,7 +84,7 @@ public UAC_Checked(const id, const UAC_CheckResult:result) {
 
 loadPlayer(id) {
 	arrayset(Players[id], 0, sizeof Players[]);
-	ExecuteForward(g_Forwards[FWD_Loadeding], g_Return, id);
+	ExecuteForward(Forwards[FWD_Loadeding], g_Return, id);
 	if (g_Return == PLUGIN_HANDLED) {
 		return;
 	}
@@ -126,7 +126,7 @@ public SV_DropClient_Post(const id) {
 	}
 
 	Players[id][PlayerStatus] = STATUS_NONE;
-	ExecuteForward(g_Forwards[FWD_Disconnecting], g_Return, id);
+	ExecuteForward(Forwards[FWD_Disconnecting], g_Return, id);
 	if (g_Return == PLUGIN_HANDLED) {
 		arrayset(Players[id], 0, sizeof Players[]);
 		return HC_CONTINUE;
@@ -196,7 +196,7 @@ public OnConnected(const status, JSON:data, const userid) {
 	stored[1] = Players[id][PlayerSessionId];
 	PDS_SetArray(Players[id][PlayerSteamId], stored, sizeof stored);
 
-	ExecuteForward(g_Forwards[FWD_Loadeded], g_Return, id, Players[id][PlayerId], data);
+	ExecuteForward(Forwards[FWD_Loadeded], g_Return, id, Players[id][PlayerId], data);
 }
 
 public OnDisconnected(const status, JSON:data, const userid) {
@@ -210,7 +210,7 @@ public OnDisconnected(const status, JSON:data, const userid) {
 	// 	server_print("User #%d not found", userid);
 	// 	return;
 	// }
-	// ExecuteForward(g_Forwards[FWD_Loadeded], g_Return, FWD_Disconnected, id, Players[id][PlayerId], data);
+	// ExecuteForward(Forwards[FWD_Loadeded], g_Return, FWD_Disconnected, id, Players[id][PlayerId], data);
 }
 
 public OnAssigned(const status, JSON:data, const userid) {

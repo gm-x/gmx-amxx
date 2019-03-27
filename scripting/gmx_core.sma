@@ -1,6 +1,6 @@
 #include <amxmodx>
-#include <json>
 #include <grip>
+#include <json>
 
 #define MAX_DATA_LENGTH 4000
 
@@ -152,25 +152,27 @@ public RequestHandler(const id) {
 				logToFile(LOG_ERROR, "Request %d finished with timeout", id);
 			}
 		}
-		callCallback(Request[RequestPluginId], Request[RequestFuncId], 0, Invalid_JSON, Request[RequestParam]);
+		callCallback(Request[RequestPluginId], Request[RequestFuncId], 0, Invalid_GripJSONValue, Request[RequestParam]);
 		return;
 	}
 
 	if (grip_get_response_status_code() != GripHTTPStatusOk) {
 		logToFile(LOG_INFO, "Request %d finished with %d status", id, grip_get_response_status_code());
-		callCallback(Request[RequestPluginId], Request[RequestFuncId], 0, Invalid_JSON, Request[RequestParam]);
+		callCallback(Request[RequestPluginId], Request[RequestFuncId], 0, Invalid_GripJSONValue, Request[RequestParam]);
 		return;
 	}
 
 	ArrayGetArray(Requests, id, Request, sizeof Request);
-	new body[MAX_DATA_LENGTH];
-	grip_get_response_body_string(body, charsmax(body));
-	new JSON:data = json_parse(body);
-
-	callCallback(Request[RequestPluginId], Request[RequestFuncId], data != Invalid_JSON ? 1 : 0, data, Request[RequestParam]);
-	if (data != Invalid_JSON) {
-		json_free(data);
+	new error[128];
+	new GripJSONValue:data = grip_json_parse_response_body(error, charsmax(error))
+	if (data == Invalid_GripJSONValue) {
+		logToFile(LOG_INFO, "Error parse response: %s", error);
+		callCallback(Request[RequestPluginId], Request[RequestFuncId], 0, Invalid_GripJSONValue, Request[RequestParam]);
+		return;
 	}
+
+	callCallback(Request[RequestPluginId], Request[RequestFuncId], 1, data, Request[RequestParam]);
+	grip_destroy_json_value(data);
 }
 
 GripBody:getBody(const JSON:json) {
@@ -183,7 +185,7 @@ GripBody:getBody(const JSON:json) {
 	return grip_body_from_string(data);
 }
 
-callCallback(const pluginId, const funcId, const status, const JSON:data, const param) {
+callCallback(const pluginId, const funcId, const status, const GripJSONValue:data, const param) {
 	if (callfunc_begin_i(funcId, pluginId) == 1) {
 		callfunc_push_int(status);
 		callfunc_push_int(_:data);
@@ -203,7 +205,7 @@ logToFile(const LogLevel:level, const msg[], any:...) {
 	new hour, minute, second;
 	time(hour, minute, second);
 
-	server_print("[GRIP] %02d:%02d:%02d: %s", hour, minute, second, message)
+	server_print("[GMX] %02d:%02d:%02d: %s", hour, minute, second, message)
 	
 	fprintf(LogFile, "%02d:%02d:%02d: %s^n", hour, minute, second, message);
 	fflush(LogFile);
