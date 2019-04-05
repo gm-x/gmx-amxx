@@ -1,4 +1,5 @@
 #include <amxmodx>
+#include <reapi>
 #include <grip>
 #include <json>
 
@@ -7,7 +8,7 @@
 #define CHECK_NATIVE_ARGS_NUM(%1,%2) \
 	if (%1 < %2) { \
 		log_error(AMX_ERR_NATIVE, "Invalid num of arguments %d. Expected %d", %1, %2); \
-		return 0; \
+		return -1; \
 	}
 
 enum LogLevel (+=1) {
@@ -28,7 +29,7 @@ new LogFile;
 new GripRequestOptions:RequestOptions = Empty_GripRequestOptions;
 new Array:Requests = Invalid_Array, Request[REQUEST];
 
-public plugin_init() {
+public plugin_precache() {
 	register_plugin("GMX Core", "0.0.4", "F@nt0M");
 
 	new path[128];
@@ -66,6 +67,16 @@ public plugin_init() {
 	new ret;
 	ExecuteForward(fwd, ret);
 	DestroyForward(fwd);
+
+	new map[64];
+	rh_get_mapname(map, charsmax(map), MNT_TRUE);
+	new JSON:data = json_init_object();
+	json_object_set_string(data, "map", map);
+	json_object_set_number(data, "max_players", MaxClients);
+	makeRequest("server/info", data);
+	json_free(data);
+
+	set_task(60.0, "TaskPing", .flags = "b");
 }
 
 public plugin_end() {
@@ -77,6 +88,10 @@ public plugin_end() {
 	}
 
 	fclose(LogFile);
+}
+
+public TaskPing() {
+	makeRequest("server/ping");
 }
 
 public plugin_natives() {
@@ -92,11 +107,16 @@ public NativeGamexMakeRequest(plugin, argc) {
 	get_string(arg_endpoint, endpoint, charsmax(endpoint));
 
 	new JSON:data = JSON:get_param(arg_data);
-	new callback[64];
+	new callback[64], funcId;
 	get_string(arg_callback, callback, charsmax(callback));
-	new funcId = get_func_id(callback, plugin);
-	if (funcId == -1) {
-		return -1;
+	if (callback[0] != EOS) {
+		funcId = get_func_id(callback, plugin);
+		if (funcId == -1) {
+			log_error(AMX_ERR_NATIVE, "Could not find function %s", callback);
+			return -1;
+		}
+	} else {
+		funcId = INVALID_PLUGIN_ID;
 	}
 
 	logToFile(LOG_DEBUG, "Call make request to '%s' with callback '%s'", endpoint, callback);
@@ -104,7 +124,7 @@ public NativeGamexMakeRequest(plugin, argc) {
 	return makeRequest(endpoint, data, plugin, funcId, argc >= 4 ? get_param(arg_param) : 0);
 }
 
-makeRequest(const endpoint[], JSON:data, const pluginId, const funcId, const param) {
+makeRequest(const endpoint[], JSON:data = Invalid_JSON, const pluginId = INVALID_PLUGIN_ID, const funcId = INVALID_PLUGIN_ID, const param = 0) {
 	if (RequestOptions == Empty_GripRequestOptions) {
 		RequestOptions = grip_create_default_options();
 		grip_options_add_header(RequestOptions, "Content-Type", "application/json");
@@ -184,7 +204,7 @@ GripBody:getBody(const JSON:json) {
 }
 
 callCallback(const pluginId, const funcId, const status, const GripJSONValue:data, const param) {
-	if (callfunc_begin_i(funcId, pluginId) == 1) {
+	if (pluginId != INVALID_PLUGIN_ID && funcId != INVALID_PLUGIN_ID && callfunc_begin_i(funcId, pluginId) == 1) {
 		callfunc_push_int(status);
 		callfunc_push_int(_:data);
 		callfunc_push_int(param);
