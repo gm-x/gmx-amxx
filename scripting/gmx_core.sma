@@ -1,7 +1,6 @@
 #include <amxmodx>
 #include <reapi>
 #include <grip>
-#include <json>
 
 #define MAX_DATA_LENGTH 4000
 
@@ -49,34 +48,40 @@ public plugin_precache() {
 	new filePath[128];
 	get_localinfo("amxx_configsdir", filePath, charsmax(filePath));
 	add(filePath, charsmax(filePath), "/gmx.json");
-	new JSON:cfg = json_parse(filePath, true, true);
-	if (cfg == Invalid_JSON || !json_is_object(cfg)) {
-		json_free(cfg);
-		set_fail_state("Coudn't open %s", filePath);
+	new error[128];
+	new GripJSONValue:cfg = grip_json_parse_file(filePath, error, charsmax(error));
+	if (cfg == Invalid_GripJSONValue) {
+		set_fail_state("Coudn't open %s. Error %s", filePath, error);
 	}
 
-	json_object_get_string(cfg, "token", Token, charsmax(Token));
-	json_object_get_string(cfg, "url", Url, charsmax(Url));
-	LogLvl = LogLevel:json_object_get_number(cfg, "loglevel");
+	if (grip_json_get_type(cfg) != GripJSONObject) {
+		grip_destroy_json_value(cfg);
+		set_fail_state("Coudn't open %s. Bad format", filePath);
+	}
+
+	grip_json_object_get_string(cfg, "token", Token, charsmax(Token));
+	grip_json_object_get_string(cfg, "url", Url, charsmax(Url));
+	LogLvl = LogLevel:grip_json_object_get_number(cfg, "loglevel");
+	grip_destroy_json_value(cfg);
 
 	logToFile(LOG_DEBUG, "Load configuration. URL is '%s'", Url);
-
-	json_free(cfg);
 
 	new fwd = CreateMultiForward("GamexCfgLoaded", ET_IGNORE);
 	new ret;
 	ExecuteForward(fwd, ret);
 	DestroyForward(fwd);
+}
 
-	new map[64];
-	rh_get_mapname(map, charsmax(map), MNT_TRUE);
-	new JSON:data = json_init_object();
-	json_object_set_string(data, "map", map);
-	json_object_set_number(data, "max_players", MaxClients);
-	makeRequest("server/info", data);
-	json_free(data);
+public plugin_init() {
+	// new map[64];
+	// rh_get_mapname(map, charsmax(map), MNT_TRUE);
+	// new GripJSONValue:data = grip_json_init_object();
+	// grip_json_object_set_string(data, "map", map);
+	// grip_json_object_set_number(data, "max_players", MaxClients);
+	// makeRequest("server/info", data);
+	// grip_destroy_json_value(data);
 
-	set_task(60.0, "TaskPing", .flags = "b");
+	// set_task(60.0, "TaskPing", .flags = "b");
 }
 
 public plugin_end() {
@@ -106,7 +111,7 @@ public NativeGamexMakeRequest(plugin, argc) {
 	new endpoint[128];
 	get_string(arg_endpoint, endpoint, charsmax(endpoint));
 
-	new JSON:data = JSON:get_param(arg_data);
+	new GripJSONValue:data = GripJSONValue:get_param(arg_data);
 	new callback[64], funcId;
 	get_string(arg_callback, callback, charsmax(callback));
 	if (callback[0] != EOS) {
@@ -124,7 +129,7 @@ public NativeGamexMakeRequest(plugin, argc) {
 	return makeRequest(endpoint, data, plugin, funcId, argc >= 4 ? get_param(arg_param) : 0);
 }
 
-makeRequest(const endpoint[], JSON:data = Invalid_JSON, const pluginId = INVALID_PLUGIN_ID, const funcId = INVALID_PLUGIN_ID, const param = 0) {
+makeRequest(const endpoint[], GripJSONValue:data = Invalid_GripJSONValue, const pluginId = INVALID_PLUGIN_ID, const funcId = INVALID_PLUGIN_ID, const param = 0) {
 	if (RequestOptions == Empty_GripRequestOptions) {
 		RequestOptions = grip_create_default_options();
 		grip_options_add_header(RequestOptions, "Content-Type", "application/json");
@@ -193,12 +198,12 @@ public RequestHandler(const id) {
 	grip_destroy_json_value(data);
 }
 
-GripBody:getBody(const JSON:json) {
-	if (json == Invalid_JSON) {
+GripBody:getBody(const GripJSONValue:json) {
+	if (json == Invalid_GripJSONValue) {
 		return Empty_GripBody;
 	}
 	new data[2000];
-	json_serial_to_string(json, data, charsmax(data));
+	grip_json_serial_to_string(json, data, charsmax(data), false);
 	logToFile(LOG_DEBUG, "Data: '%s'", data);
 	return grip_body_from_string(data);
 }

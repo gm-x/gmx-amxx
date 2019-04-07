@@ -1,7 +1,6 @@
 #include <amxmodx>
 #include <reapi>
 #include <grip>
-#include <json>
 #include <PersistentDataStorage>
 #include <gmx>
 #include <uac>
@@ -101,23 +100,23 @@ loadPlayer(id) {
 		? REU_GetProtocol(id)
 		: 0;
 
-	new JSON:data = json_init_object();
-	json_object_set_number(data, "emulator", emulator);
-	json_object_set_string(data, "steamid", steamid);
-	json_object_set_string(data, "nick", nick);
-	json_object_set_string(data, "ip", ip);
+	new GripJSONValue:data = grip_json_init_object();
+	grip_json_object_set_number(data, "emulator", emulator);
+	grip_json_object_set_string(data, "steamid", steamid);
+	grip_json_object_set_string(data, "nick", nick);
+	grip_json_object_set_string(data, "ip", ip);
 
 	new stored[2];
 	if (PDS_GetArray(steamid, stored, sizeof stored)) {
-		json_object_set_number(data, "id", stored[0]);
-		json_object_set_number(data, "session_id", stored[1]);
+		grip_json_object_set_number(data, "id", stored[0]);
+		grip_json_object_set_number(data, "session_id", stored[1]);
 	} else {
-		json_object_set_null(data, "id");
-		json_object_set_null(data, "session_id");
+		grip_json_object_set_null(data, "id");
+		grip_json_object_set_null(data, "session_id");
 	}
 
 	GamexMakeRequest("player/connect", data, "OnConnected", get_user_userid(id));
-	json_free(data);
+	grip_destroy_json_value(data);
 }
 
 public SV_DropClient_Post(const id) {
@@ -133,10 +132,10 @@ public SV_DropClient_Post(const id) {
 		return HC_CONTINUE;
 	}
 
-	new JSON:data = json_init_object();
-	json_object_set_number(data, "session_id", Players[id][PlayerSessionId]);
+	new GripJSONValue:data = grip_json_init_object();
+	grip_json_object_set_number(data, "session_id", Players[id][PlayerSessionId]);
 	GamexMakeRequest("player/disconnect", data, "", get_user_userid(id));
-	json_free(data);
+	grip_destroy_json_value(data);
 	arrayset(Players[id], 0, sizeof Players[]);
 	return HC_CONTINUE;
 }
@@ -145,11 +144,11 @@ public CmdAssing(id) {
 	new token[36];
 	read_args(token, charsmax(token));
 	remove_quotes(token);
-	new JSON:data = json_init_object();
-	json_object_set_number(data, "id", Players[id][PlayerId]);
-	json_object_set_string(data, "token", token);
+	new GripJSONValue:data = grip_json_init_object();
+	grip_json_object_set_number(data, "id", Players[id][PlayerId]);
+	grip_json_object_set_string(data, "token", token);
 	GamexMakeRequest("player/assign", data, "OnAssigned", get_user_userid(id));
-	json_free(data);
+	grip_destroy_json_value(data);
 }
 
 public OnConnected(const status, GripJSONValue:data, const userid) {

@@ -3,4 +3,4 @@ enum {
 	GMX_REQ_STATUS_OK = 1
 }
 
-native GamexMakeRequest(const endpoint[], JSON:data, const callback[], const param = 0);
+native GamexMakeRequest(const endpoint[], GripJSONValue:data, const callback[], const param = 0);
