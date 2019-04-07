@@ -73,15 +73,15 @@ public plugin_precache() {
 }
 
 public plugin_init() {
-	// new map[64];
-	// rh_get_mapname(map, charsmax(map), MNT_TRUE);
-	// new GripJSONValue:data = grip_json_init_object();
-	// grip_json_object_set_string(data, "map", map);
-	// grip_json_object_set_number(data, "max_players", MaxClients);
-	// makeRequest("server/info", data);
-	// grip_destroy_json_value(data);
+	new map[64];
+	rh_get_mapname(map, charsmax(map), MNT_TRUE);
+	new GripJSONValue:data = grip_json_init_object();
+	grip_json_object_set_string(data, "map", map);
+	grip_json_object_set_number(data, "max_players", MaxClients);
+	makeRequest("server/info", data);
+	grip_destroy_json_value(data);
 
-	// set_task(60.0, "TaskPing", .flags = "b");
+	set_task(60.0, "TaskPing", .flags = "b");
 }
 
 public plugin_end() {
