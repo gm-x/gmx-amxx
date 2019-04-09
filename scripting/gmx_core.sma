@@ -147,7 +147,8 @@ makeRequest(const endpoint[], GripJSONValue:data = Invalid_GripJSONValue, const 
 	new id = ArrayPushArray(Requests, Request, sizeof Request);
 	logToFile(LOG_DEBUG, "Make request to '%s/api/%s'. Request ID %d", Url, endpoint, id);
 
-	new GripBody:body = getBody(data);
+	// new GripBody:body = getBody(data);
+	new GripBody:body = data != Invalid_GripJSONValue ? grip_body_from_json(data) : Empty_GripBody;
 	grip_request(fmt("%s/api/%s", Url, endpoint), body, GripRequestTypePost, "RequestHandler", RequestOptions, id);
 	if (body != Empty_GripBody) {
 		grip_destroy_body(body);
@@ -198,7 +199,7 @@ public RequestHandler(const id) {
 	grip_destroy_json_value(data);
 }
 
-GripBody:getBody(const GripJSONValue:json) {
+stock GripBody:getBody(const GripJSONValue:json) {
 	if (json == Invalid_GripJSONValue) {
 		return Empty_GripBody;
 	}
