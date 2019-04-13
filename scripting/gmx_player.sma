@@ -151,8 +151,8 @@ public CmdAssing(id) {
 	grip_destroy_json_value(data);
 }
 
-public OnConnected(const status, GripJSONValue:data, const userid) {
-	if (status != GMX_REQ_STATUS_OK) {
+public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const userid) {
+	if (status != GmxResponseStatusOk) {
 		return;
 	}
 
@@ -188,8 +188,8 @@ public OnConnected(const status, GripJSONValue:data, const userid) {
 	ExecuteForward(Forwards[FWD_Loadeded], g_Return, id, Players[id][PlayerId], data);
 }
 
-public OnAssigned(const status, GripJSONValue:data, const userid) {
-	if (status != GMX_REQ_STATUS_OK) {
+public OnAssigned(const GmxResponseStatus:status, GripJSONValue:data, const userid) {
+	if (status != GmxResponseStatusOk) {
 		return;
 	}
 
