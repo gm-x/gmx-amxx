@@ -111,11 +111,16 @@ loadPlayer(id) {
 		grip_json_object_set_number(data, "id", stored[0]);
 		grip_json_object_set_number(data, "session_id", stored[1]);
 	} else {
+		stored[0] = 0;
+		stored[1] = 0;
 		grip_json_object_set_null(data, "id");
 		grip_json_object_set_null(data, "session_id");
 	}
 
-	GamexMakeRequest("player/connect", data, "OnConnected", get_user_userid(id));
+	new userid = get_user_userid(id);
+
+	GamexLog(GmxLogDebug, "Player #%d <emu: %d> <steamid: %s> <ip: %s> <nick: %s> <id: %d> <session %d> connecting to server", userid, emulator, steamid, ip, nick, stored[0], stored[1]);
+	GamexMakeRequest("player/connect", data, "OnConnected", userid);
 	grip_destroy_json_value(data);
 }
 
@@ -131,6 +136,8 @@ public SV_DropClient_Post(const id) {
 		arrayset(Players[id], 0, sizeof Players[]);
 		return HC_CONTINUE;
 	}
+
+	GamexLog(GmxLogDebug, "Player #%d <player: %d> <session: %d> <user: %d> disconnecting from server", get_user_userid(id), Players[id][PlayerId], Players[id][PlayerSessionId], Players[id][PlayerUserId]);
 
 	new GripJSONValue:data = grip_json_init_object();
 	grip_json_object_set_number(data, "session_id", Players[id][PlayerSessionId]);
@@ -177,6 +184,8 @@ public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const use
 	// 		: 0;
 	// 	json_free(tmp);
 	// }
+
+	GamexLog(GmxLogDebug, "Player #%d <player: %d> <session: %d> <user: %d> connected to server", userid, Players[id][PlayerId], Players[id][PlayerSessionId], Players[id][PlayerUserId]);
 
 	Players[id][PlayerStatus] = STATUS_LOADED;
 

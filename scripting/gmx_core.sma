@@ -11,13 +11,6 @@
 		return -1; \
 	}
 
-enum LogLevel (+=1) {
-	LOG_CRITICAL = 0,
-	LOG_ERROR,
-	LOG_INFO,
-	LOG_DEBUG
-};
-
 enum _:REQUEST {
 	RequestPluginId,
 	RequestFuncId,
@@ -25,7 +18,7 @@ enum _:REQUEST {
 };
 
 new PluginId, bool:ApiEnabled = true, LogFile;
-new Token[65], Url[256], LogLevel:LogLvl;
+new Token[65], Url[256], GmxLogLevel:LogLvl;
 new GripRequestOptions:RequestOptions = Empty_GripRequestOptions;
 new Array:Requests = Invalid_Array, Request[REQUEST];
 
@@ -83,7 +76,7 @@ public OnInfoResponse(const GmxResponseStatus:status) {
 
 		case GmxResponseStatusBadToken: {
 			ApiEnabled = false;
-			logToFile(LOG_ERROR, "Bad token. Change valid in gmx.json and reload config");
+			logToFile(GmxLogError, "Bad token. Change valid in gmx.json and reload config");
 		}
 	}
 }
@@ -109,10 +102,10 @@ loadConfig() {
 
 	grip_json_object_get_string(cfg, "token", Token, charsmax(Token));
 	grip_json_object_get_string(cfg, "url", Url, charsmax(Url));
-	LogLvl = LogLevel:grip_json_object_get_number(cfg, "loglevel");
+	LogLvl = GmxLogLevel:grip_json_object_get_number(cfg, "loglevel");
 	grip_destroy_json_value(cfg);
 
-	logToFile(LOG_DEBUG, "Load configuration. URL is '%s'", Url);
+	logToFile(GmxLogInfo, "Load configuration. URL is '%s'", Url);
 
 	new fwd = CreateMultiForward("GamexCfgLoaded", ET_IGNORE);
 	new ret;
@@ -132,6 +125,7 @@ makeInfoRequest() {
 
 public plugin_natives() {
 	register_native("GamexMakeRequest", "NativeGamexMakeRequest", 0);
+	register_native("GamexLog", "NativeGamexLog", 0);
 }
 
 public NativeGamexMakeRequest(plugin, argc) {
@@ -160,9 +154,18 @@ public NativeGamexMakeRequest(plugin, argc) {
 		funcId = INVALID_PLUGIN_ID;
 	}
 
-	logToFile(LOG_DEBUG, "Call make request to '%s' with callback '%s'", endpoint, callback);
-
 	return makeRequest(endpoint, data, plugin, funcId, argc >= 4 ? get_param(arg_param) : 0);
+}
+
+public NativeGamexLog(plugin, argc) {
+	CHECK_NATIVE_ARGS_NUM(argc, 2)
+
+	enum { arg_level = 1, arg_fmt, arg_params };
+
+	new message[512];
+	vdformat(message, charsmax(message), arg_fmt, arg_params);
+	logToFile(GmxLogLevel:get_param(arg_level), message);
+	return 1;
 }
 
 makeRequest(const endpoint[], GripJSONValue:data = Invalid_GripJSONValue, const pluginId = INVALID_PLUGIN_ID, const funcId = INVALID_PLUGIN_ID, const param = 0) {
@@ -181,7 +184,6 @@ makeRequest(const endpoint[], GripJSONValue:data = Invalid_GripJSONValue, const 
 		Requests = ArrayCreate(REQUEST);
 	}
 	new id = ArrayPushArray(Requests, Request, sizeof Request);
-	logToFile(LOG_DEBUG, "Make request to '%s/api/%s'. Request ID %d", Url, endpoint, id);
 
 	new GripBody:body = data != Invalid_GripJSONValue ? grip_body_from_json(data) : Empty_GripBody;
 	grip_request(fmt("%s/api/%s", Url, endpoint), body, GripRequestTypePost, "RequestHandler", RequestOptions, id);
@@ -193,24 +195,24 @@ makeRequest(const endpoint[], GripJSONValue:data = Invalid_GripJSONValue, const 
 
 public RequestHandler(const id) {
 	if (id < 0 || id >= ArraySize(Requests)) {
-		logToFile(LOG_ERROR, "Bad request id %d", id);
+		logToFile(GmxLogError, "Bad request id %d", id);
 		return;
 	}
 
 	if (grip_get_response_state() != GripResponseStateSuccessful) {
 		switch (grip_get_response_state()) {
 			case GripResponseStateCancelled: {
-				logToFile(LOG_INFO, "Request %d was cancaled", id);
+				logToFile(GmxLogError, "Request %d was cancaled", id);
 				callCallback(Request[RequestPluginId], Request[RequestFuncId], GmxResponseStatusCanceled, Invalid_GripJSONValue, Request[RequestParam]);
 			}
 			case GripResponseStateError: {
 				new err[256];
 				grip_get_error_description(err, charsmax(err))
-				logToFile(LOG_ERROR, "Request %d finished with error: %s", id, err);
+				logToFile(GmxLogError, "Request %d finished with error: %s", id, err);
 				callCallback(Request[RequestPluginId], Request[RequestFuncId], GmxResponseStatusError, Invalid_GripJSONValue, Request[RequestParam]);
 			}
 			case GripResponseStateTimeout: {
-				logToFile(LOG_ERROR, "Request %d finished with timeout", id);
+				logToFile(GmxLogError, "Request %d finished with timeout", id);
 				callCallback(Request[RequestPluginId], Request[RequestFuncId], GmxResponseStatusTimeout, Invalid_GripJSONValue, Request[RequestParam]);
 			}
 		}
@@ -219,7 +221,7 @@ public RequestHandler(const id) {
 
 	new GripHTTPStatus:code = GripHTTPStatus:grip_get_response_status_code();
 	if (code != GripHTTPStatusOk) {
-		logToFile(LOG_INFO, "Request %d finished with %d status", id, code);
+		logToFile(GmxLogError, "Request %d finished with %d status", id, code);
 		switch (code) {
 			case GripHTTPStatusForbidden: {
 				callCallback(Request[RequestPluginId], Request[RequestFuncId], GmxResponseStatusBadToken, Invalid_GripJSONValue, Request[RequestParam]);
@@ -245,7 +247,7 @@ public RequestHandler(const id) {
 	new error[128];
 	new GripJSONValue:data = grip_json_parse_response_body(error, charsmax(error))
 	if (data == Invalid_GripJSONValue) {
-		logToFile(LOG_INFO, "Error parse response: %s", error);
+		logToFile(GmxLogInfo, "Error parse response: %s", error);
 		callCallback(Request[RequestPluginId], Request[RequestFuncId], GmxResponseStatusBadResponse, Invalid_GripJSONValue, Request[RequestParam]);
 		return;
 	}
@@ -263,7 +265,7 @@ callCallback(const pluginId, const funcId, const GmxResponseStatus:status, const
 	}
 }
 
-logToFile(const LogLevel:level, const msg[], any:...) {
+logToFile(const GmxLogLevel:level, const msg[], any:...) {
 	if (level > LogLvl) {
 		return;
 	}
