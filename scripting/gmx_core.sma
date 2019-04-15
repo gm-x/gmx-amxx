@@ -82,7 +82,10 @@ public OnInfoResponse(const GmxResponseStatus:status) {
 }
 
 public TaskPing() {
-	makeRequest("server/ping");
+	new GripJSONValue:data = grip_json_init_object();
+	grip_json_object_set_number(data, "num_players", get_playersnum());
+	makeRequest("server/ping", data);
+	grip_destroy_json_value(data);
 }
 
 loadConfig() {
