@@ -1,5 +1,4 @@
 #include <amxmodx>
-#include <reapi>
 #include <grip>
 #include <gmx>
 
@@ -118,7 +117,7 @@ loadConfig() {
 
 makeInfoRequest() {
 	new map[64];
-	rh_get_mapname(map, charsmax(map), MNT_TRUE);
+	get_mapname(map, charsmax(map));
 	new GripJSONValue:data = grip_json_init_object();
 	grip_json_object_set_string(data, "map", map);
 	grip_json_object_set_number(data, "max_players", MaxClients);
