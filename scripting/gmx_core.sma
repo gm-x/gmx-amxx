@@ -42,7 +42,7 @@ public plugin_precache() {
 }
 
 public plugin_init() {
-	register_concmd("gmx_reloadconfig", "CmdReloadConfig", ADMIN_RCON);
+	register_concmd("gmx_reloadcfg", "CmdReloadConfig", ADMIN_RCON);
 	makeInfoRequest();
 }
 
