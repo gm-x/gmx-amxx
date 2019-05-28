@@ -1,6 +1,6 @@
 #include <amxmodx>
 #include <reapi>
-#include <json>
+#include <grip>
 #include <PersistentDataStorage>
 #include <gmx>
 #include <uac>
@@ -14,7 +14,7 @@ enum FWD {
 	FWD_Disconnected,
 }
 
-new g_Forwards[FWD];
+new Forwards[FWD];
 new g_Return;
 
 enum {
@@ -33,22 +33,22 @@ enum _:PLAYER {
 new Players[MAX_PLAYERS + 1][PLAYER];
 
 public plugin_init() {
-	register_plugin("GMX Player", "0.0.2", "F@nt0M");
+	register_plugin("GMX Player", "0.0.2", "GM-X Team");
 
 	RegisterHookChain(RH_SV_DropClient, "SV_DropClient_Post", true);
 
-	g_Forwards[FWD_Loadeding] = CreateMultiForward("GMX_PlayerLoading", ET_STOP, FP_CELL);
-	g_Forwards[FWD_Loadeded] = CreateMultiForward("GMX_PlayerLoaded", ET_IGNORE, FP_CELL, FP_CELL, FP_CELL);
-	g_Forwards[FWD_Disconnecting] = CreateMultiForward("GMX_PlayerDisconnecting", ET_IGNORE, FP_CELL);
-	g_Forwards[FWD_Disconnected] = CreateMultiForward("GMX_PlayerDisconnected", ET_IGNORE, FP_CELL);
+	Forwards[FWD_Loadeding] = CreateMultiForward("GMX_PlayerLoading", ET_STOP, FP_CELL);
+	Forwards[FWD_Loadeded] = CreateMultiForward("GMX_PlayerLoaded", ET_IGNORE, FP_CELL, FP_CELL, FP_CELL);
+	Forwards[FWD_Disconnecting] = CreateMultiForward("GMX_PlayerDisconnecting", ET_STOP, FP_CELL);
+	Forwards[FWD_Disconnected] = CreateMultiForward("GMX_PlayerDisconnected", ET_IGNORE, FP_CELL);
 
 	register_clcmd("gmx_assign", "CmdAssing");
 }
 
 public plugin_end() {
-	DestroyForward(g_Forwards[FWD_Loadeding]);
-	DestroyForward(g_Forwards[FWD_Loadeded]);
-	DestroyForward(g_Forwards[FWD_Disconnecting]);
+	DestroyForward(Forwards[FWD_Loadeding]);
+	DestroyForward(Forwards[FWD_Loadeded]);
+	DestroyForward(Forwards[FWD_Disconnecting]);
 }
 
 public PDS_Save() {
@@ -84,7 +84,7 @@ public UAC_Checked(const id, const UAC_CheckResult:result) {
 
 loadPlayer(id) {
 	arrayset(Players[id], 0, sizeof Players[]);
-	ExecuteForward(g_Forwards[FWD_Loadeding], g_Return, id);
+	ExecuteForward(Forwards[FWD_Loadeding], g_Return, id);
 	if (g_Return == PLUGIN_HANDLED) {
 		return;
 	}
@@ -100,23 +100,28 @@ loadPlayer(id) {
 		? REU_GetProtocol(id)
 		: 0;
 
-	new JSON:data = json_init_object();
-	json_object_set_number(data, "emulator", emulator);
-	json_object_set_string(data, "steamid", steamid);
-	json_object_set_string(data, "nick", nick);
-	json_object_set_string(data, "ip", ip);
+	new GripJSONValue:data = grip_json_init_object();
+	grip_json_object_set_number(data, "emulator", emulator);
+	grip_json_object_set_string(data, "steamid", steamid);
+	grip_json_object_set_string(data, "nick", nick);
+	grip_json_object_set_string(data, "ip", ip);
 
 	new stored[2];
 	if (PDS_GetArray(steamid, stored, sizeof stored)) {
-		json_object_set_number(data, "id", stored[0]);
-		json_object_set_number(data, "session_id", stored[1]);
+		grip_json_object_set_number(data, "id", stored[0]);
+		grip_json_object_set_number(data, "session_id", stored[1]);
 	} else {
-		json_object_set_null(data, "id");
-		json_object_set_null(data, "session_id");
+		stored[0] = 0;
+		stored[1] = 0;
+		grip_json_object_set_null(data, "id");
+		grip_json_object_set_null(data, "session_id");
 	}
 
-	GamexMakeRequest("player/connect", data, "OnConnected", get_user_userid(id));
-	json_free(data);
+	new userid = get_user_userid(id);
+
+	GamexLog(GmxLogDebug, "Player #%d <emu: %d> <steamid: %s> <ip: %s> <nick: %s> <id: %d> <session %d> connecting to server", userid, emulator, steamid, ip, nick, stored[0], stored[1]);
+	GamexMakeRequest("player/connect", data, "OnConnected", userid);
+	grip_destroy_json_value(data);
 }
 
 public SV_DropClient_Post(const id) {
@@ -126,16 +131,18 @@ public SV_DropClient_Post(const id) {
 	}
 
 	Players[id][PlayerStatus] = STATUS_NONE;
-	ExecuteForward(g_Forwards[FWD_Disconnecting], g_Return, id);
+	ExecuteForward(Forwards[FWD_Disconnecting], g_Return, id);
 	if (g_Return == PLUGIN_HANDLED) {
 		arrayset(Players[id], 0, sizeof Players[]);
 		return HC_CONTINUE;
 	}
 
-	new JSON:data = json_init_object();
-	json_object_set_number(data, "id", Players[id][PlayerId]);
-	GamexMakeRequest("player/disconnect", data, "OnDisconnected", get_user_userid(id));
-	json_free(data);
+	GamexLog(GmxLogDebug, "Player #%d <player: %d> <session: %d> <user: %d> disconnecting from server", get_user_userid(id), Players[id][PlayerId], Players[id][PlayerSessionId], Players[id][PlayerUserId]);
+
+	new GripJSONValue:data = grip_json_init_object();
+	grip_json_object_set_number(data, "session_id", Players[id][PlayerSessionId]);
+	GamexMakeRequest("player/disconnect", data, "", get_user_userid(id));
+	grip_destroy_json_value(data);
 	arrayset(Players[id], 0, sizeof Players[]);
 	return HC_CONTINUE;
 }
@@ -144,42 +151,31 @@ public CmdAssing(id) {
 	new token[36];
 	read_args(token, charsmax(token));
 	remove_quotes(token);
-	new JSON:data = json_init_object();
-	json_object_set_number(data, "id", Players[id][PlayerId]);
-	json_object_set_string(data, "token", token);
+	new GripJSONValue:data = grip_json_init_object();
+	grip_json_object_set_number(data, "id", Players[id][PlayerId]);
+	grip_json_object_set_string(data, "token", token);
 	GamexMakeRequest("player/assign", data, "OnAssigned", get_user_userid(id));
-	json_free(data);
+	grip_destroy_json_value(data);
 }
 
-public OnConnected(const status, JSON:data, const userid) {
-	if (status != GMX_REQ_STATUS_OK) {
-		server_print("Error load player #%d", userid);
+public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const userid) {
+	if (status != GmxResponseStatusOk) {
 		return;
 	}
 
 	new id = getUserByUserID(userid);
 	if (id == 0) {
-		server_print("User #%d not found", userid);
 		return;
 	}
 
-	if (!json_is_object(data)) {
-		server_print("Bad response");
+	if (grip_json_get_type(data) != GripJSONObject) {
 		return;
 	}
 
-
-	Players[id][PlayerId] = json_object_has_value(data, "player_id", JSONNumber)
-		? json_object_get_number(data, "player_id")
-		: 0;
-
-	Players[id][PlayerSessionId] = json_object_has_value(data, "session_id", JSONNumber)
-		? json_object_get_number(data, "session_id")
-		: 0;
-
-	Players[id][PlayerUserId] = json_object_has_value(data, "user_id", JSONNumber)
-		? json_object_get_number(data, "user_id")
-		: 0;
+	Players[id][PlayerId] = grip_json_object_get_number(data, "player_id");
+	Players[id][PlayerSessionId] = grip_json_object_get_number(data, "session_id");
+	new GripJSONValue:userIdVal = grip_json_object_get_value(data, "user_id");
+	Players[id][PlayerUserId] = grip_json_get_type(userIdVal) != GripJSONNull ? grip_json_get_number(userIdVal) : 0;
 
 	// if (json_object_has_value(data, "user", JSONObject)) {
 	// 	new JSON:tmp = json_object_get_value(data, "user");
@@ -189,6 +185,8 @@ public OnConnected(const status, JSON:data, const userid) {
 	// 	json_free(tmp);
 	// }
 
+	GamexLog(GmxLogDebug, "Player #%d <player: %d> <session: %d> <user: %d> connected to server", userid, Players[id][PlayerId], Players[id][PlayerSessionId], Players[id][PlayerUserId]);
+
 	Players[id][PlayerStatus] = STATUS_LOADED;
 
 	new stored[2];
@@ -196,43 +194,24 @@ public OnConnected(const status, JSON:data, const userid) {
 	stored[1] = Players[id][PlayerSessionId];
 	PDS_SetArray(Players[id][PlayerSteamId], stored, sizeof stored);
 
-	ExecuteForward(g_Forwards[FWD_Loadeded], g_Return, id, Players[id][PlayerId], data);
+	ExecuteForward(Forwards[FWD_Loadeded], g_Return, id, Players[id][PlayerId], data);
 }
 
-public OnDisconnected(const status, JSON:data, const userid) {
-	if (status != GMX_REQ_STATUS_OK) {
-		server_print("Error saving player #%d", userid);
-		return;
-	}
-
-	// new id = getUserByUserID(userid);
-	// if (id == 0) {
-	// 	server_print("User #%d not found", userid);
-	// 	return;
-	// }
-	// ExecuteForward(g_Forwards[FWD_Loadeded], g_Return, FWD_Disconnected, id, Players[id][PlayerId], data);
-}
-
-public OnAssigned(const status, JSON:data, const userid) {
-	if (status != GMX_REQ_STATUS_OK) {
-		server_print("Error assign player #%d", userid);
+public OnAssigned(const GmxResponseStatus:status, GripJSONValue:data, const userid) {
+	if (status != GmxResponseStatusOk) {
 		return;
 	}
 
 	new id = getUserByUserID(userid);
 	if (id == 0) {
-		server_print("User #%d not found", userid);
 		return;
 	}
 
-	if (!json_is_object(data)) {
-		server_print("Bad response");
+	if (grip_json_get_type(data) != GripJSONObject) {
 		return;
 	}
 
-	Players[id][PlayerUserId] = json_object_has_value(data, "user_id", JSONNumber)
-		? json_object_get_number(data, "user_id")
-		: 0;
+	Players[id][PlayerUserId] = grip_json_object_get_number(data, "user_id");
 }
 
 // public PDS_Save() {

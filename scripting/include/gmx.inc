@@ -1,6 +1,24 @@
-enum {
-	GMX_REQ_STATUS_ERROR = 0,
-	GMX_REQ_STATUS_OK = 1
+enum GmxResponseStatus {
+	GmxResponseStatusOk,
+	GmxResponseStatusCanceled,
+	GmxResponseStatusError,
+	GmxResponseStatusTimeout,
+	GmxResponseStatusNotFound,
+	GmxResponseStatusBadToken,
+	GmxResponseStatusServerError,
+	GmxResponseStatusBadResponse,
+	GmxResponseStatusUnknownError
 }
 
-native GamexMakeRequest(const endpoint[], JSON:data, const callback[], const param = 0);
+enum GmxLogLevel (+=1) {
+	GmxLogCritical = 0,
+	GmxLogError,
+	GmxLogInfo,
+	GmxLogDebug
+};
+
+forward GamexCfgLoaded();
+
+native GamexMakeRequest(const endpoint[], GripJSONValue:data, const callback[], const param = 0);
+
+native GamexLog(const GmxLogLevel:level, const fmt[], any:...);
