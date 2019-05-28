@@ -22,7 +22,7 @@ new GripRequestOptions:RequestOptions = Empty_GripRequestOptions;
 new Array:Requests = Invalid_Array, Request[REQUEST];
 
 public plugin_precache() {
-	PluginId = register_plugin("GMX Core", "0.0.4", "F@nt0M");
+	PluginId = register_plugin("GMX Core", "0.0.4", "GM-X Team");
 
 	new path[128];
 	get_localinfo("amxx_logs", path, charsmax(path));

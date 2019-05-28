@@ -33,7 +33,7 @@ enum _:PLAYER {
 new Players[MAX_PLAYERS + 1][PLAYER];
 
 public plugin_init() {
-	register_plugin("GMX Player", "0.0.2", "F@nt0M");
+	register_plugin("GMX Player", "0.0.2", "GM-X Team");
 
 	RegisterHookChain(RH_SV_DropClient, "SV_DropClient_Post", true);
 
