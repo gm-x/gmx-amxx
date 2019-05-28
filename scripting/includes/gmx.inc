@@ -1,1 +1,0 @@
-native GamexMakeRequest(const endpoint[], &JSON:data, const callback[], const param = 0);
