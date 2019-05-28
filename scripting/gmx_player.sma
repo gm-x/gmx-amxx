@@ -11,7 +11,7 @@ enum FWD {
 	FWD_Loadeding,
 	FWD_Loadeded,
 	FWD_Disconnecting,
-	FWD_Disconnected,
+	// FWD_Disconnected,
 }
 
 new Forwards[FWD];
@@ -40,7 +40,7 @@ public plugin_init() {
 	Forwards[FWD_Loadeding] = CreateMultiForward("GMX_PlayerLoading", ET_STOP, FP_CELL);
 	Forwards[FWD_Loadeded] = CreateMultiForward("GMX_PlayerLoaded", ET_IGNORE, FP_CELL, FP_CELL, FP_CELL);
 	Forwards[FWD_Disconnecting] = CreateMultiForward("GMX_PlayerDisconnecting", ET_STOP, FP_CELL);
-	Forwards[FWD_Disconnected] = CreateMultiForward("GMX_PlayerDisconnected", ET_IGNORE, FP_CELL);
+	// Forwards[FWD_Disconnected] = CreateMultiForward("GMX_PlayerDisconnected", ET_IGNORE, FP_CELL);
 
 	register_clcmd("gmx_assign", "CmdAssing");
 }
@@ -49,6 +49,7 @@ public plugin_end() {
 	DestroyForward(Forwards[FWD_Loadeding]);
 	DestroyForward(Forwards[FWD_Loadeded]);
 	DestroyForward(Forwards[FWD_Disconnecting]);
+	// DestroyForward(Forwards[FWD_Disconnected]);
 }
 
 public PDS_Save() {
@@ -194,7 +195,7 @@ public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const use
 	stored[1] = Players[id][PlayerSessionId];
 	PDS_SetArray(Players[id][PlayerSteamId], stored, sizeof stored);
 
-	ExecuteForward(Forwards[FWD_Loadeded], g_Return, id, Players[id][PlayerId], data);
+	ExecuteForward(Forwards[FWD_Loadeded], g_Return, id, data);
 }
 
 public OnAssigned(const GmxResponseStatus:status, GripJSONValue:data, const userid) {

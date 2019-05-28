@@ -1,21 +1,12 @@
-enum GmxResponseStatus {
-	GmxResponseStatusOk,
-	GmxResponseStatusCanceled,
-	GmxResponseStatusError,
-	GmxResponseStatusTimeout,
-	GmxResponseStatusNotFound,
-	GmxResponseStatusBadToken,
-	GmxResponseStatusServerError,
-	GmxResponseStatusBadResponse,
-	GmxResponseStatusUnknownError
-}
+#if defined _gmx_included
+	#endinput
+#endif
 
-enum GmxLogLevel (+=1) {
-	GmxLogCritical = 0,
-	GmxLogError,
-	GmxLogInfo,
-	GmxLogDebug
-};
+#define _gmx_included
+
+#include <gmx_consts>
+#include <gmx_player>
+
 
 forward GamexCfgLoaded();
 
