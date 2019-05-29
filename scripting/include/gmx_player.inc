@@ -12,6 +12,8 @@ forward GMX_PlayerLoaded(const id, GripJSONValue:data);
 
 forward GMX_PlayerDisconnecting(const id);
 
+native bool:GMX_PlayerIsLoaded(const id);
+
 native GMX_PlayerGetPlayerId(const id);
 
 native GMX_PlayerGetUserId(const id);

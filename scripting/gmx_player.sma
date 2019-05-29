@@ -5,6 +5,24 @@
 #include <gmx>
 #include <uac>
 
+#define CHECK_NATIVE_ARGS_NUM(%1,%2,%3) \
+	if (%1 < %2) { \
+		log_error(AMX_ERR_NATIVE, "Invalid num of arguments %d. Expected %d", %1, %2); \
+		return %3; \
+	}
+
+#define CHECK_NATIVE_PLAYER(%1,%2) \
+    if (!is_user_connected(%1)) { \
+        log_error(AMX_ERR_NATIVE, "Invalid player %d", %1); \
+        return %2; \
+    }
+
+#define CHECK_NATIVE_PLAYER_LOADED(%1,%2) \
+    if (Players[%1][PlayerStatus] != STATUS_LOADED) { \
+        log_error(AMX_ERR_NATIVE, "Player %d not loaded", %1); \
+        return %2; \
+    }
+
 new bool:UAC_IsLoaded = false;
 
 enum FWD {
@@ -120,8 +138,8 @@ loadPlayer(id) {
 
 	new userid = get_user_userid(id);
 
-	GamexLog(GmxLogDebug, "Player #%d <emu: %d> <steamid: %s> <ip: %s> <nick: %s> <id: %d> <session %d> connecting to server", userid, emulator, steamid, ip, nick, stored[0], stored[1]);
-	GamexMakeRequest("player/connect", data, "OnConnected", userid);
+	GMX_Log(GmxLogDebug, "Player #%d <emu: %d> <steamid: %s> <ip: %s> <nick: %s> <id: %d> <session %d> connecting to server", userid, emulator, steamid, ip, nick, stored[0], stored[1]);
+	GMX_MakeRequest("player/connect", data, "OnConnected", userid);
 	grip_destroy_json_value(data);
 }
 
@@ -138,11 +156,11 @@ public SV_DropClient_Post(const id) {
 		return HC_CONTINUE;
 	}
 
-	GamexLog(GmxLogDebug, "Player #%d <player: %d> <session: %d> <user: %d> disconnecting from server", get_user_userid(id), Players[id][PlayerId], Players[id][PlayerSessionId], Players[id][PlayerUserId]);
+	GMX_Log(GmxLogDebug, "Player #%d <player: %d> <session: %d> <user: %d> disconnecting from server", get_user_userid(id), Players[id][PlayerId], Players[id][PlayerSessionId], Players[id][PlayerUserId]);
 
 	new GripJSONValue:data = grip_json_init_object();
 	grip_json_object_set_number(data, "session_id", Players[id][PlayerSessionId]);
-	GamexMakeRequest("player/disconnect", data, "", get_user_userid(id));
+	GMX_MakeRequest("player/disconnect", data, "", get_user_userid(id));
 	grip_destroy_json_value(data);
 	arrayset(Players[id], 0, sizeof Players[]);
 	return HC_CONTINUE;
@@ -155,7 +173,7 @@ public CmdAssing(id) {
 	new GripJSONValue:data = grip_json_init_object();
 	grip_json_object_set_number(data, "id", Players[id][PlayerId]);
 	grip_json_object_set_string(data, "token", token);
-	GamexMakeRequest("player/assign", data, "OnAssigned", get_user_userid(id));
+	GMX_MakeRequest("player/assign", data, "OnAssigned", get_user_userid(id));
 	grip_destroy_json_value(data);
 }
 
@@ -164,7 +182,7 @@ public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const use
 		return;
 	}
 
-	new id = getUserByUserID(userid);
+	new id = GMX_GetPlayerByUserID(userid);
 	if (id == 0) {
 		return;
 	}
@@ -186,7 +204,7 @@ public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const use
 	// 	json_free(tmp);
 	// }
 
-	GamexLog(GmxLogDebug, "Player #%d <player: %d> <session: %d> <user: %d> connected to server", userid, Players[id][PlayerId], Players[id][PlayerSessionId], Players[id][PlayerUserId]);
+	GMX_Log(GmxLogDebug, "Player #%d <player: %d> <session: %d> <user: %d> connected to server", userid, Players[id][PlayerId], Players[id][PlayerSessionId], Players[id][PlayerUserId]);
 
 	Players[id][PlayerStatus] = STATUS_LOADED;
 
@@ -203,7 +221,7 @@ public OnAssigned(const GmxResponseStatus:status, GripJSONValue:data, const user
 		return;
 	}
 
-	new id = getUserByUserID(userid);
+	new id = GMX_GetPlayerByUserID(userid);
 	if (id == 0) {
 		return;
 	}
@@ -215,24 +233,56 @@ public OnAssigned(const GmxResponseStatus:status, GripJSONValue:data, const user
 	Players[id][PlayerUserId] = grip_json_object_get_number(data, "user_id");
 }
 
-// public PDS_Save() {
-// 	for (new id = 1, key[32], data[2]; id <= MaxClients; id++) {
-// 		if (Players[id][PlayerStatus] == STATUS_LOADED && Players[id][PlayerId] > 0) {
-// 			formatex(key, charsmax(key), "gmx_pl_%d", get_user_userid(id));
-// 			data[0] = Players[id][PlayerId];
-// 			data[1] = Players[id][PlayerUserId];
-// 			PDS_SetArray(key, data, sizeof data);
-// 		}
-// 	}
-	
-// }
+public plugin_natives() {
+	register_native("GMX_PlayerIsLoaded", "NativeIsLoaded", 0);
+	register_native("GMX_PlayerGetPlayerId", "NativeGetPlayerId", 0);
+	register_native("GMX_PlayerGetUserId", "NativeGetUserId", 0);
+	register_native("GMX_PlayerGetSessionId", "NativeGetSessionId", 0);
+}
 
-stock getUserByUserID(const userid) {
-	for (new id = 1; id <= MaxClients; id++) {
-		if ((is_user_connected(id) || is_user_connecting(id)) && get_user_userid(id) == userid) {
-			return id;
-		}
-	}
+public NativeIsLoaded(plugin, argc) {
+	enum { arg_player = 1 };
 
-	return 0;
+	CHECK_NATIVE_ARGS_NUM(argc, 1, false)
+
+	new player = get_param(arg_player);
+	CHECK_NATIVE_PLAYER(player, false)
+
+	return bool:(Players[player][PlayerStatus] == STATUS_LOADED);
+}
+
+public NativeGetPlayerId(plugin, argc) {
+	enum { arg_player = 1 };
+
+	CHECK_NATIVE_ARGS_NUM(argc, 1, 0)
+
+	new player = get_param(arg_player);
+	CHECK_NATIVE_PLAYER(1, 0)
+	CHECK_NATIVE_PLAYER_LOADED(1, 0)
+
+	return Players[player][PlayerId];
+}
+
+public NativeGetUserId(plugin, argc) {
+	enum { arg_player = 1 };
+
+	CHECK_NATIVE_ARGS_NUM(argc, 1, 0)
+
+	new player = get_param(arg_player);
+	CHECK_NATIVE_PLAYER(1, 0)
+	CHECK_NATIVE_PLAYER_LOADED(1, 0)
+
+	return Players[player][PlayerUserId];
+}
+
+public NativeGetSessionId(plugin, argc) {
+	enum { arg_player = 1 };
+
+	CHECK_NATIVE_ARGS_NUM(argc, 1, 0)
+
+	new player = get_param(arg_player);
+	CHECK_NATIVE_PLAYER(1, 0)
+	CHECK_NATIVE_PLAYER_LOADED(1, 0)
+
+	return Players[player][PlayerSessionId];
 }

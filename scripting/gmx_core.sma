@@ -4,10 +4,10 @@
 
 #define MAX_DATA_LENGTH 4000
 
-#define CHECK_NATIVE_ARGS_NUM(%1,%2) \
+#define CHECK_NATIVE_ARGS_NUM(%1,%2,%3) \
 	if (%1 < %2) { \
 		log_error(AMX_ERR_NATIVE, "Invalid num of arguments %d. Expected %d", %1, %2); \
-		return -1; \
+		return %3; \
 	}
 
 enum _:REQUEST {
@@ -109,7 +109,7 @@ loadConfig() {
 
 	logToFile(GmxLogInfo, "Load configuration. URL is '%s'", Url);
 
-	new fwd = CreateMultiForward("GamexCfgLoaded", ET_IGNORE);
+	new fwd = CreateMultiForward("GMX_CfgLoaded", ET_IGNORE);
 	new ret;
 	ExecuteForward(fwd, ret);
 	DestroyForward(fwd);
@@ -126,12 +126,12 @@ makeInfoRequest() {
 }
 
 public plugin_natives() {
-	register_native("GamexMakeRequest", "NativeGamexMakeRequest", 0);
-	register_native("GamexLog", "NativeGamexLog", 0);
+	register_native("GMX_MakeRequest", "NativeMakeRequest", 0);
+	register_native("GMX_Log", "NativeLog", 0);
 }
 
-public NativeGamexMakeRequest(plugin, argc) {
-	CHECK_NATIVE_ARGS_NUM(argc, 3)
+public NativeMakeRequest(plugin, argc) {
+	CHECK_NATIVE_ARGS_NUM(argc, 3, -1)
 
 	if (!ApiEnabled) {
 		log_error(AMX_ERR_NATIVE, "API is not enabled. Please check log files");
@@ -159,8 +159,8 @@ public NativeGamexMakeRequest(plugin, argc) {
 	return makeRequest(endpoint, data, plugin, funcId, argc >= 4 ? get_param(arg_param) : 0);
 }
 
-public NativeGamexLog(plugin, argc) {
-	CHECK_NATIVE_ARGS_NUM(argc, 2)
+public NativeLog(plugin, argc) {
+	CHECK_NATIVE_ARGS_NUM(argc, 2, 0)
 
 	enum { arg_level = 1, arg_fmt, arg_params };
 
