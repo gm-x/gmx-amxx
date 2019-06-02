@@ -19,3 +19,13 @@ native GMX_PlayerGetPlayerId(const id);
 native GMX_PlayerGetUserId(const id);
 
 native GMX_PlayerGetSessionId(const id);
+
+stock GMX_GetPlayerBPlayerID(const playerid) {
+	for (new id = 1; id <= MaxClients; id++) {
+		if (is_user_connected(id) && GMX_PlayerIsLoaded(id) && GMX_PlayerGetPlayerId(id) == playerid) {
+			return id;
+		}
+	}
+
+	return 0;
+}

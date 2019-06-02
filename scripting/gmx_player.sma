@@ -33,7 +33,7 @@ enum FWD {
 }
 
 new Forwards[FWD];
-new g_Return;
+new Return;
 
 enum {
 	STATUS_NONE = 0,
@@ -56,7 +56,7 @@ public plugin_init() {
 	RegisterHookChain(RH_SV_DropClient, "SV_DropClient_Post", true);
 
 	Forwards[FWD_Loadeding] = CreateMultiForward("GMX_PlayerLoading", ET_STOP, FP_CELL);
-	Forwards[FWD_Loadeded] = CreateMultiForward("GMX_PlayerLoaded", ET_IGNORE, FP_CELL, FP_CELL, FP_CELL);
+	Forwards[FWD_Loadeded] = CreateMultiForward("GMX_PlayerLoaded", ET_IGNORE, FP_CELL, FP_CELL);
 	Forwards[FWD_Disconnecting] = CreateMultiForward("GMX_PlayerDisconnecting", ET_STOP, FP_CELL);
 	// Forwards[FWD_Disconnected] = CreateMultiForward("GMX_PlayerDisconnected", ET_IGNORE, FP_CELL);
 
@@ -103,8 +103,8 @@ public UAC_Checked(const id, const UAC_CheckResult:result) {
 
 loadPlayer(id) {
 	arrayset(Players[id], 0, sizeof Players[]);
-	ExecuteForward(Forwards[FWD_Loadeding], g_Return, id);
-	if (g_Return == PLUGIN_HANDLED) {
+	ExecuteForward(Forwards[FWD_Loadeding], Return, id);
+	if (Return == PLUGIN_HANDLED) {
 		return;
 	}
 
@@ -150,8 +150,8 @@ public SV_DropClient_Post(const id) {
 	}
 
 	Players[id][PlayerStatus] = STATUS_NONE;
-	ExecuteForward(Forwards[FWD_Disconnecting], g_Return, id);
-	if (g_Return == PLUGIN_HANDLED) {
+	ExecuteForward(Forwards[FWD_Disconnecting], Return, id);
+	if (Return == PLUGIN_HANDLED) {
 		arrayset(Players[id], 0, sizeof Players[]);
 		return HC_CONTINUE;
 	}
@@ -213,7 +213,7 @@ public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const use
 	stored[1] = Players[id][PlayerSessionId];
 	PDS_SetArray(Players[id][PlayerSteamId], stored, sizeof stored);
 
-	ExecuteForward(Forwards[FWD_Loadeded], g_Return, id, data);
+	ExecuteForward(Forwards[FWD_Loadeded], Return, id, data);
 }
 
 public OnAssigned(const GmxResponseStatus:status, GripJSONValue:data, const userid) {
