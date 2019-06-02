@@ -26,8 +26,8 @@
 new bool:UAC_IsLoaded = false;
 
 enum FWD {
-	FWD_Loadeding,
-	FWD_Loadeded,
+	FWD_Loading,
+	FWD_Loaded,
 	FWD_Disconnecting,
 	// FWD_Disconnected,
 }
@@ -55,8 +55,8 @@ public plugin_init() {
 
 	RegisterHookChain(RH_SV_DropClient, "SV_DropClient_Post", true);
 
-	Forwards[FWD_Loadeding] = CreateMultiForward("GMX_PlayerLoading", ET_STOP, FP_CELL);
-	Forwards[FWD_Loadeded] = CreateMultiForward("GMX_PlayerLoaded", ET_IGNORE, FP_CELL, FP_CELL);
+	Forwards[FWD_Loading] = CreateMultiForward("GMX_PlayerLoading", ET_STOP, FP_CELL);
+	Forwards[FWD_Loaded] = CreateMultiForward("GMX_PlayerLoaded", ET_IGNORE, FP_CELL, FP_CELL);
 	Forwards[FWD_Disconnecting] = CreateMultiForward("GMX_PlayerDisconnecting", ET_STOP, FP_CELL);
 	// Forwards[FWD_Disconnected] = CreateMultiForward("GMX_PlayerDisconnected", ET_IGNORE, FP_CELL);
 
@@ -64,8 +64,8 @@ public plugin_init() {
 }
 
 public plugin_end() {
-	DestroyForward(Forwards[FWD_Loadeding]);
-	DestroyForward(Forwards[FWD_Loadeded]);
+	DestroyForward(Forwards[FWD_Loading]);
+	DestroyForward(Forwards[FWD_Loaded]);
 	DestroyForward(Forwards[FWD_Disconnecting]);
 	// DestroyForward(Forwards[FWD_Disconnected]);
 }
@@ -103,7 +103,7 @@ public UAC_Checked(const id, const UAC_CheckResult:result) {
 
 loadPlayer(id) {
 	arrayset(Players[id], 0, sizeof Players[]);
-	ExecuteForward(Forwards[FWD_Loadeding], Return, id);
+	ExecuteForward(Forwards[FWD_Loading], Return, id);
 	if (Return == PLUGIN_HANDLED) {
 		return;
 	}
@@ -213,7 +213,7 @@ public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const use
 	stored[1] = Players[id][PlayerSessionId];
 	PDS_SetArray(Players[id][PlayerSteamId], stored, sizeof stored);
 
-	ExecuteForward(Forwards[FWD_Loadeded], Return, id, data);
+	ExecuteForward(Forwards[FWD_Loaded], Return, id, data);
 }
 
 public OnAssigned(const GmxResponseStatus:status, GripJSONValue:data, const userid) {
