@@ -85,10 +85,14 @@ public client_connect(id) {
 }
 
 public client_putinserver(id) {
-	if (!UAC_IsLoaded && !is_user_bot(id) && !is_user_hltv(id)) {
+	if (!UAC_IsLoaded) {
 		loadPlayer(id);
 	}
 	get_user_authid(id, Players[id][PlayerSteamId], 31);
+}
+
+public client_disconnected(id) {
+	Players[id][PlayerStatus] = STATUS_NONE;
 }
 
 public UAC_Loaded() {
@@ -96,12 +100,16 @@ public UAC_Loaded() {
 }
 
 public UAC_Checked(const id, const UAC_CheckResult:result) {
-	if (result != UAC_CHECK_KICK && !is_user_bot(id) && !is_user_hltv(id) && Players[id][PlayerStatus] != STATUS_LOADED) {
+	if (result != UAC_CHECK_KICK) {
 		loadPlayer(id);
 	}
 }
 
 loadPlayer(id) {
+	if (!canBeLoaded(id)) {
+		return;
+	}
+
 	arrayset(Players[id], 0, sizeof Players[]);
 	ExecuteForward(Forwards[FWD_Loading], Return, id);
 	if (Return == PLUGIN_HANDLED) {
@@ -141,6 +149,10 @@ loadPlayer(id) {
 	GMX_Log(GmxLogDebug, "Player #%d <emu: %d> <steamid: %s> <ip: %s> <nick: %s> <id: %d> <session %d> connecting to server", userid, emulator, steamid, ip, nick, stored[0], stored[1]);
 	GMX_MakeRequest("player/connect", data, "OnConnected", userid);
 	grip_destroy_json_value(data);
+}
+
+bool:canBeLoaded(const id) {
+	return bool:(Players[id][PlayerStatus] == STATUS_NONE == !is_user_bot(id) && !is_user_hltv(id));
 }
 
 public SV_DropClient_Post(const id) {
