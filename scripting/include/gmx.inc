@@ -1,24 +1,36 @@
-enum GmxResponseStatus {
-	GmxResponseStatusOk,
-	GmxResponseStatusCanceled,
-	GmxResponseStatusError,
-	GmxResponseStatusTimeout,
-	GmxResponseStatusNotFound,
-	GmxResponseStatusBadToken,
-	GmxResponseStatusServerError,
-	GmxResponseStatusBadResponse,
-	GmxResponseStatusUnknownError
-}
+#if defined _gmx_included
+	#endinput
+#endif
 
-enum GmxLogLevel (+=1) {
-	GmxLogCritical = 0,
-	GmxLogError,
-	GmxLogInfo,
-	GmxLogDebug
-};
+#define _gmx_included
 
-forward GamexCfgLoaded();
+#include <gmx_consts>
+#include <gmx_stocks>
 
-native GamexMakeRequest(const endpoint[], GripJSONValue:data, const callback[], const param = 0);
+/**
+ * Called when config was loaded
+ */
+forward GMX_CfgLoaded();
 
-native GamexLog(const GmxLogLevel:level, const fmt[], any:...);
+/**
+ * Make request to API
+ *
+ * @param endpoint
+ * @param data
+ * @param callback
+ * @param param
+ *
+ * @return ID of request, -1 if error occurred
+ */
+native GMX_MakeRequest(const endpoint[], GripJSONValue:data, const callback[], const param = 0);
+
+/**
+ * Make request to API
+ *
+ * @param endpoint
+ * @param fmt
+ * @param ...
+ *
+ * @return 1 if success, 0 if error occurred
+ */
+native GMX_Log(const GmxLogLevel:level, const fmt[], any:...);
