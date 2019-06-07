@@ -5,12 +5,6 @@
 #include <gmx>
 #include <uac>
 
-#define CHECK_NATIVE_ARGS_NUM(%1,%2,%3) \
-	if (%1 < %2) { \
-		log_error(AMX_ERR_NATIVE, "Invalid num of arguments %d. Expected %d", %1, %2); \
-		return %3; \
-	}
-
 #define CHECK_NATIVE_PLAYER(%1,%2) \
     if (!is_user_connected(%1)) { \
         log_error(AMX_ERR_NATIVE, "Invalid player %d", %1); \
@@ -46,12 +40,12 @@ enum _:PLAYER {
 	PlayerId,
 	PlayerUserId,
 	PlayerSessionId,
-	PlayerSteamId[32]
+	PlayerSteamId[MAX_AUTHID_LENGTH]
 };
 new Players[MAX_PLAYERS + 1][PLAYER];
 
 public plugin_init() {
-	register_plugin("GMX Player", "0.0.2", "GM-X Team");
+	register_plugin("GMX Player", "0.0.3", "GM-X Team");
 
 	RegisterHookChain(RH_SV_DropClient, "SV_DropClient_Post", true);
 
@@ -88,7 +82,8 @@ public client_putinserver(id) {
 	if (!UAC_IsLoaded) {
 		loadPlayer(id);
 	}
-	get_user_authid(id, Players[id][PlayerSteamId], 31);
+
+	get_user_authid(id, Players[id][PlayerSteamId], charsmax(Players[][PlayerSteamId]));
 }
 
 public client_disconnected(id) {
@@ -118,16 +113,15 @@ loadPlayer(id) {
 
 	Players[id][PlayerStatus] = STATUS_LOADING;
 
-	new steamid[24], nick[32], ip[32];
+	new steamid[MAX_AUTHID_LENGTH], nick[MAX_NAME_LENGTH], ip[MAX_IP_LENGTH];
+
 	get_user_authid(id, steamid, charsmax(steamid));
 	get_user_name(id, nick, charsmax(nick));
 	get_user_ip(id, ip, charsmax(ip), 1);
 
-	new emulator = has_reunion()
-		? REU_GetProtocol(id)
-		: 0;
-
+	new emulator = has_reunion() ? REU_GetProtocol(id) : 0;
 	new GripJSONValue:data = grip_json_init_object();
+
 	grip_json_object_set_number(data, "emulator", emulator);
 	grip_json_object_set_string(data, "steamid", steamid);
 	grip_json_object_set_string(data, "nick", nick);
@@ -179,10 +173,13 @@ public SV_DropClient_Post(const id) {
 }
 
 public CmdAssing(id) {
-	new token[36];
+	new token[GMX_MAX_ASSIGN_TOKEN_LENGTH];
+
 	read_args(token, charsmax(token));
 	remove_quotes(token);
+
 	new GripJSONValue:data = grip_json_init_object();
+	
 	grip_json_object_set_number(data, "id", Players[id][PlayerId]);
 	grip_json_object_set_string(data, "token", token);
 	GMX_MakeRequest("player/assign", data, "OnAssigned", get_user_userid(id));
@@ -195,7 +192,8 @@ public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const use
 	}
 
 	new id = GMX_GetPlayerByUserID(userid);
-	if (id == 0) {
+
+	if (!id) {
 		return;
 	}
 
@@ -234,7 +232,8 @@ public OnAssigned(const GmxResponseStatus:status, GripJSONValue:data, const user
 	}
 
 	new id = GMX_GetPlayerByUserID(userid);
-	if (id == 0) {
+
+	if (!id) {
 		return;
 	}
 
