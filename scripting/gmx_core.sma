@@ -46,6 +46,10 @@ public plugin_init() {
 	makeInfoRequest();
 }
 
+public plugin_cfg() {
+	checkAPIVersion();
+}
+
 public plugin_end() {
 	if (Requests != Invalid_Array) {
 		ArrayDestroy(Requests);
@@ -282,4 +286,31 @@ logToFile(const GmxLogLevel:level, const msg[], any:...) {
 	
 	fprintf(LogFile, "%02d:%02d:%02d: %s^n", hour, minute, second, message);
 	fflush(LogFile);
+}
+
+checkAPIVersion() {
+	for(new i, n = get_pluginsnum(), status[2], func; i < n; i++) {
+		if(i == PluginId) {
+			continue;
+		}
+
+		get_plugin(i, .status = status, .len5 = charsmax(status));
+
+		//status debug || status running
+		if(status[0] != 'd' && status[0] != 'r') {
+			continue;
+		}
+	
+		func = get_func_id("__gmx_version_check", i);
+
+		if(func == -1) {
+			continue;
+		}
+
+		if(callfunc_begin_i(func, i) == 1) {
+			callfunc_push_int(GMX_MAJOR_VERSION);
+			callfunc_push_int(GMX_MINOR_VERSION);
+			callfunc_end();
+		}
+	}
 }
