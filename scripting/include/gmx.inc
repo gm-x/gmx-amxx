@@ -8,10 +8,10 @@
 #include <gmx_stocks>
 
 #define GMX_MAJOR_VERSION			0
-#define GMX_MINOR_VERSION			1
-#define GMX_MAINTENANCE_VERSION		1
+#define GMX_MINOR_VERSION			0
+#define GMX_MAINTENANCE_VERSION		5
 
-stock const GMX_API_VERSION_STR[] = "0.1.0";
+stock const GMX_API_VERSION_STR[] = "0.0.5";
 
 /**
  * Called when config was loaded

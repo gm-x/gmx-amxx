@@ -71,7 +71,11 @@ enum _:PLAYER {
 new Players[MAX_PLAYERS + 1][PLAYER];
 
 public plugin_precache() {
-	PluginId = register_plugin("GMX Core", "0.0.4", "GM-X Team");
+	PluginId = register_plugin(
+		"GMX Core",
+		fmt("%d.%d.%d", GMX_MAJOR_VERSION, GMX_MINOR_VERSION, GMX_MAINTENANCE_VERSION), 
+		"GM-X Team"
+	);
 
 	new path[128];
 	get_localinfo("amxx_logs", path, charsmax(path));
@@ -177,10 +181,6 @@ public client_putinserver(id) {
 #endif
 }
 
-public client_disconnected(id) {
-	Players[id][PlayerStatus] = STATUS_NONE;
-}
-
 #if defined _uac_included
 public UAC_Loaded() {
 	UAC_IsLoaded = true;
@@ -249,7 +249,6 @@ public SV_DropClient_Post(const id) {
 		return HC_CONTINUE;
 	}
 
-	Players[id][PlayerStatus] = STATUS_NONE;
 	ExecuteForward(Forwards[FWD_Disconnecting], FReturn, id);
 	if (FReturn == PLUGIN_HANDLED) {
 		arrayset(Players[id], 0, sizeof Players[]);
@@ -263,6 +262,7 @@ public SV_DropClient_Post(const id) {
 	makeRequest("player/disconnect", data);
 	grip_destroy_json_value(data);
 	arrayset(Players[id], 0, sizeof Players[]);
+	Players[id][PlayerStatus] = STATUS_NONE;
 	return HC_CONTINUE;
 }
 
