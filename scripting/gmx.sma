@@ -70,6 +70,7 @@ enum _:PLAYER {
 };
 new Players[MAX_PLAYERS + 1][PLAYER];
 
+// Begin forwards
 public plugin_precache() {
 	PluginId = register_plugin(
 		"GMX Core",
@@ -109,6 +110,12 @@ public plugin_init() {
 	Forwards[FWD_Loading] = CreateMultiForward("GMX_PlayerLoading", ET_STOP, FP_CELL);
 	Forwards[FWD_Loaded] = CreateMultiForward("GMX_PlayerLoaded", ET_IGNORE, FP_CELL, FP_CELL);
 	Forwards[FWD_Disconnecting] = CreateMultiForward("GMX_PlayerDisconnecting", ET_STOP, FP_CELL);
+
+	register_srvcmd("gmx_debug", "CmdDebug");
+}
+
+public CmdDebug() {
+	TaskPing();
 }
 
 public plugin_cfg() {
@@ -124,36 +131,6 @@ public plugin_end() {
 	}
 
 	fclose(LogFile);
-}
-
-public CmdReloadConfig(id, level) {
-	if (~get_user_flags(id) & level) {
-		console_print(id, "You have no access to that command");
-		return PLUGIN_HANDLED;
-	}
-	loadConfig();
-	makeInfoRequest();
-	return PLUGIN_HANDLED;
-}
-
-public OnInfoResponse(const GmxResponseStatus:status) {
-	switch (status) {
-		case GmxResponseStatusOk: {
-			set_task(60.0, "TaskPing", .flags = "b");
-		}
-
-		case GmxResponseStatusBadToken: {
-			ApiEnabled = false;
-			logToFile(GmxLogError, "Bad token. Change valid in gmx.json and reload config");
-		}
-	}
-}
-
-public TaskPing() {
-	new GripJSONValue:data = grip_json_init_object();
-	grip_json_object_set_number(data, "num_players", get_playersnum());
-	makeRequest("server/ping", data);
-	grip_destroy_json_value(data);
 }
 
 public PDS_Save() {
@@ -193,56 +170,6 @@ public UAC_Checked(const id, const UAC_CheckResult:result) {
 }
 #endif
 
-loadPlayer(id) {
-	if (!canBeLoaded(id)) {
-		return;
-	}
-
-	arrayset(Players[id], 0, sizeof Players[]);
-	ExecuteForward(Forwards[FWD_Loading], FReturn, id);
-	if (FReturn == PLUGIN_HANDLED) {
-		return;
-	}
-
-	Players[id][PlayerStatus] = STATUS_LOADING;
-
-	new steamid[24], nick[32], ip[32];
-	get_user_authid(id, steamid, charsmax(steamid));
-	get_user_name(id, nick, charsmax(nick));
-	get_user_ip(id, ip, charsmax(ip), 1);
-
-	new emulator = has_reunion()
-		? REU_GetProtocol(id)
-		: 0;
-
-	new GripJSONValue:data = grip_json_init_object();
-	grip_json_object_set_number(data, "emulator", emulator);
-	grip_json_object_set_string(data, "steamid", steamid);
-	grip_json_object_set_string(data, "nick", nick);
-	grip_json_object_set_string(data, "ip", ip);
-
-	new stored[2];
-	if (PDS_GetArray(steamid, stored, sizeof stored)) {
-		grip_json_object_set_number(data, "id", stored[0]);
-		grip_json_object_set_number(data, "session_id", stored[1]);
-	} else {
-		stored[0] = 0;
-		stored[1] = 0;
-		grip_json_object_set_null(data, "id");
-		grip_json_object_set_null(data, "session_id");
-	}
-
-	new userid = get_user_userid(id);
-
-	logToFile(GmxLogDebug, "Player #%d <emu: %d> <steamid: %s> <ip: %s> <nick: %s> <id: %d> <session %d> connecting to server", userid, emulator, steamid, ip, nick, stored[0], stored[1]);
-	makeRequest("player/connect", data, PluginId, Functions[FnOnConnected], userid);
-	grip_destroy_json_value(data);
-}
-
-bool:canBeLoaded(const id) {
-	return bool:(Players[id][PlayerStatus] == STATUS_NONE && !is_user_bot(id) && !is_user_hltv(id));
-}
-
 public SV_DropClient_Post(const id) {
 	if (Players[id][PlayerStatus] != STATUS_LOADED || Players[id][PlayerId] <= 0) {
 		arrayset(Players[id], 0, sizeof Players[]);
@@ -264,6 +191,59 @@ public SV_DropClient_Post(const id) {
 	arrayset(Players[id], 0, sizeof Players[]);
 	Players[id][PlayerStatus] = STATUS_NONE;
 	return HC_CONTINUE;
+}
+
+public TaskPing() {
+	new GripJSONValue:data = grip_json_init_object();
+	grip_json_object_set_number(data, "num_players", get_playersnum());
+
+	new GripJSONValue:sessions = grip_json_init_array();
+	for (new id = 1; id <= MaxClients; id++) {
+		if (Players[id][PlayerStatus] == STATUS_LOADED) {
+			grip_json_array_append_number(sessions, Players[id][PlayerSessionId]);
+		}
+	}
+	grip_json_object_set_value(data, "sessions", sessions);
+
+	makeRequest("server/ping", data);
+	grip_destroy_json_value(sessions);
+	grip_destroy_json_value(data);
+}
+
+public CmdReloadConfig(id, level) {
+	if (~get_user_flags(id) & level) {
+		console_print(id, "You have no access to that command");
+		return PLUGIN_HANDLED;
+	}
+	loadConfig();
+	makeInfoRequest();
+	return PLUGIN_HANDLED;
+}
+
+public CmdAssing(id) {
+	new token[36];
+	read_args(token, charsmax(token));
+	remove_quotes(token);
+	new GripJSONValue:data = grip_json_init_object();
+	grip_json_object_set_number(data, "id", Players[id][PlayerId]);
+	grip_json_object_set_string(data, "token", token);
+	makeRequest("player/assign", data, PluginId, Functions[FnOnAssigned], get_user_userid(id));
+	grip_destroy_json_value(data);
+}
+// End forwards
+
+// Begin callbacks
+public OnInfoResponse(const GmxResponseStatus:status) {
+	switch (status) {
+		case GmxResponseStatusOk: {
+			set_task(60.0, "TaskPing", .flags = "b");
+		}
+
+		case GmxResponseStatusBadToken: {
+			ApiEnabled = false;
+			logToFile(GmxLogError, "Bad token. Change valid in gmx.json and reload config");
+		}
+	}
 }
 
 public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const userid) {
@@ -305,17 +285,6 @@ public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const use
 	ExecuteForward(Forwards[FWD_Loaded], FReturn, id, data);
 }
 
-public CmdAssing(id) {
-	new token[36];
-	read_args(token, charsmax(token));
-	remove_quotes(token);
-	new GripJSONValue:data = grip_json_init_object();
-	grip_json_object_set_number(data, "id", Players[id][PlayerId]);
-	grip_json_object_set_string(data, "token", token);
-	makeRequest("player/assign", data, PluginId, Functions[FnOnAssigned], get_user_userid(id));
-	grip_destroy_json_value(data);
-}
-
 public OnAssigned(const GmxResponseStatus:status, GripJSONValue:data, const userid) {
 	if (status != GmxResponseStatusOk) {
 		return;
@@ -332,94 +301,9 @@ public OnAssigned(const GmxResponseStatus:status, GripJSONValue:data, const user
 
 	Players[id][PlayerUserId] = grip_json_object_get_number(data, "user_id");
 }
+// End callbacks
 
-loadConfig() {
-	new filePath[128];
-	get_localinfo("amxx_configsdir", filePath, charsmax(filePath));
-	add(filePath, charsmax(filePath), "/gmx.json");
-	new error[128];
-	new GripJSONValue:cfg = grip_json_parse_file(filePath, error, charsmax(error));
-	if (cfg == Invalid_GripJSONValue) {
-		set_fail_state("Coudn't open %s. Error %s", filePath, error);
-	}
-
-	if (grip_json_get_type(cfg) != GripJSONObject) {
-		grip_destroy_json_value(cfg);
-		set_fail_state("Coudn't open %s. Bad format", filePath);
-	}
-
-	grip_json_object_get_string(cfg, "token", Token, charsmax(Token));
-	grip_json_object_get_string(cfg, "url", Url, charsmax(Url));
-	LogLvl = GmxLogLevel:grip_json_object_get_number(cfg, "loglevel");
-	grip_destroy_json_value(cfg);
-
-	logToFile(GmxLogInfo, "Load configuration. URL is '%s'", Url);
-
-	new fwd = CreateMultiForward("GMX_CfgLoaded", ET_IGNORE);
-	new ret;
-	ExecuteForward(fwd, ret);
-	DestroyForward(fwd);
-}
-
-makeInfoRequest() {
-	new map[64];
-	get_mapname(map, charsmax(map));
-	new GripJSONValue:data = grip_json_init_object();
-	grip_json_object_set_string(data, "map", map);
-	grip_json_object_set_number(data, "max_players", MaxClients);
-	makeRequest("server/info", data, PluginId, Functions[FnOnInfoResponse]);
-	grip_destroy_json_value(data);
-}
-
-public plugin_natives() {
-	register_native("GMX_MakeRequest", "NativeMakeRequest", 0);
-	register_native("GMX_Log", "NativeLog", 0);
-	register_native("GMX_PlayerIsLoaded", "NativeIsLoaded", 0);
-	register_native("GMX_PlayerGetPlayerId", "NativeGetPlayerId", 0);
-	register_native("GMX_PlayerGetUserId", "NativeGetUserId", 0);
-	register_native("GMX_PlayerGetSessionId", "NativeGetSessionId", 0);
-}
-
-public NativeMakeRequest(plugin, argc) {
-	CHECK_NATIVE_ARGS_NUM(argc, 3, -1)
-
-	if (!ApiEnabled) {
-		log_error(AMX_ERR_NATIVE, "API is not enabled. Please check log files");
-		return -1;
-	}
-
-	enum { arg_endpoint = 1, arg_data, arg_callback, arg_param };
-
-	new endpoint[128];
-	get_string(arg_endpoint, endpoint, charsmax(endpoint));
-
-	new GripJSONValue:data = GripJSONValue:get_param(arg_data);
-	new callback[64], funcId;
-	get_string(arg_callback, callback, charsmax(callback));
-	if (callback[0] != EOS) {
-		funcId = get_func_id(callback, plugin);
-		if (funcId == -1) {
-			log_error(AMX_ERR_NATIVE, "Could not find function %s", callback);
-			return -1;
-		}
-	} else {
-		funcId = INVALID_PLUGIN_ID;
-	}
-
-	return makeRequest(endpoint, data, plugin, funcId, argc >= 4 ? get_param(arg_param) : 0);
-}
-
-public NativeLog(plugin, argc) {
-	CHECK_NATIVE_ARGS_NUM(argc, 2, 0)
-
-	enum { arg_level = 1, arg_fmt, arg_params };
-
-	new message[512];
-	vdformat(message, charsmax(message), arg_fmt, arg_params);
-	logToFile(GmxLogLevel:get_param(arg_level), message);
-	return 1;
-}
-
+// Begin request
 makeRequest(const endpoint[], GripJSONValue:data = Invalid_GripJSONValue, const pluginId = INVALID_PLUGIN_ID, const funcId = INVALID_PLUGIN_ID, const param = 0) {
 	if (RequestOptions == Empty_GripRequestOptions) {
 		RequestOptions = grip_create_default_options();
@@ -507,6 +391,96 @@ public RequestHandler(const id) {
 	callCallback(Request[RequestPluginId], Request[RequestFuncId], GmxResponseStatusOk, data, Request[RequestParam]);
 	grip_destroy_json_value(data);
 }
+// Endrequest
+
+// Begin functions
+loadConfig() {
+	new filePath[128];
+	get_localinfo("amxx_configsdir", filePath, charsmax(filePath));
+	add(filePath, charsmax(filePath), "/gmx.json");
+	new error[128];
+	new GripJSONValue:cfg = grip_json_parse_file(filePath, error, charsmax(error));
+	if (cfg == Invalid_GripJSONValue) {
+		set_fail_state("Coudn't open %s. Error %s", filePath, error);
+	}
+
+	if (grip_json_get_type(cfg) != GripJSONObject) {
+		grip_destroy_json_value(cfg);
+		set_fail_state("Coudn't open %s. Bad format", filePath);
+	}
+
+	grip_json_object_get_string(cfg, "token", Token, charsmax(Token));
+	grip_json_object_get_string(cfg, "url", Url, charsmax(Url));
+	LogLvl = GmxLogLevel:grip_json_object_get_number(cfg, "loglevel");
+	grip_destroy_json_value(cfg);
+
+	logToFile(GmxLogInfo, "Load configuration. URL is '%s'", Url);
+
+	new fwd = CreateMultiForward("GMX_CfgLoaded", ET_IGNORE);
+	new ret;
+	ExecuteForward(fwd, ret);
+	DestroyForward(fwd);
+}
+
+makeInfoRequest() {
+	new map[64];
+	get_mapname(map, charsmax(map));
+	new GripJSONValue:data = grip_json_init_object();
+	grip_json_object_set_string(data, "map", map);
+	grip_json_object_set_number(data, "max_players", MaxClients);
+	makeRequest("server/info", data, PluginId, Functions[FnOnInfoResponse]);
+	grip_destroy_json_value(data);
+}
+
+loadPlayer(id) {
+	if (!canBeLoaded(id)) {
+		return;
+	}
+
+	arrayset(Players[id], 0, sizeof Players[]);
+	ExecuteForward(Forwards[FWD_Loading], FReturn, id);
+	if (FReturn == PLUGIN_HANDLED) {
+		return;
+	}
+
+	Players[id][PlayerStatus] = STATUS_LOADING;
+
+	new steamid[24], nick[32], ip[32];
+	get_user_authid(id, steamid, charsmax(steamid));
+	get_user_name(id, nick, charsmax(nick));
+	get_user_ip(id, ip, charsmax(ip), 1);
+
+	new emulator = has_reunion()
+		? REU_GetProtocol(id)
+		: 0;
+
+	new GripJSONValue:data = grip_json_init_object();
+	grip_json_object_set_number(data, "emulator", emulator);
+	grip_json_object_set_string(data, "steamid", steamid);
+	grip_json_object_set_string(data, "nick", nick);
+	grip_json_object_set_string(data, "ip", ip);
+
+	new stored[2];
+	if (PDS_GetArray(steamid, stored, sizeof stored)) {
+		grip_json_object_set_number(data, "id", stored[0]);
+		grip_json_object_set_number(data, "session_id", stored[1]);
+	} else {
+		stored[0] = 0;
+		stored[1] = 0;
+		grip_json_object_set_null(data, "id");
+		grip_json_object_set_null(data, "session_id");
+	}
+
+	new userid = get_user_userid(id);
+
+	logToFile(GmxLogDebug, "Player #%d <emu: %d> <steamid: %s> <ip: %s> <nick: %s> <id: %d> <session %d> connecting to server", userid, emulator, steamid, ip, nick, stored[0], stored[1]);
+	makeRequest("player/connect", data, PluginId, Functions[FnOnConnected], userid);
+	grip_destroy_json_value(data);
+}
+
+bool:canBeLoaded(const id) {
+	return bool:(Players[id][PlayerStatus] == STATUS_NONE && !is_user_bot(id) && !is_user_hltv(id));
+}
 
 callCallback(const pluginId, const funcId, const GmxResponseStatus:status, const GripJSONValue:data, const param) {
 	if (pluginId != INVALID_PLUGIN_ID && funcId != INVALID_PLUGIN_ID && callfunc_begin_i(funcId, pluginId) == 1) {
@@ -532,6 +506,57 @@ logToFile(const GmxLogLevel:level, const msg[], any:...) {
 	
 	fprintf(LogFile, "%02d:%02d:%02d: %s^n", hour, minute, second, message);
 	fflush(LogFile);
+}
+// End functions
+
+// Begin natives
+public plugin_natives() {
+	register_native("GMX_MakeRequest", "NativeMakeRequest", 0);
+	register_native("GMX_Log", "NativeLog", 0);
+	register_native("GMX_PlayerIsLoaded", "NativeIsLoaded", 0);
+	register_native("GMX_PlayerGetPlayerId", "NativeGetPlayerId", 0);
+	register_native("GMX_PlayerGetUserId", "NativeGetUserId", 0);
+	register_native("GMX_PlayerGetSessionId", "NativeGetSessionId", 0);
+}
+
+public NativeMakeRequest(plugin, argc) {
+	CHECK_NATIVE_ARGS_NUM(argc, 3, -1)
+
+	if (!ApiEnabled) {
+		log_error(AMX_ERR_NATIVE, "API is not enabled. Please check log files");
+		return -1;
+	}
+
+	enum { arg_endpoint = 1, arg_data, arg_callback, arg_param };
+
+	new endpoint[128];
+	get_string(arg_endpoint, endpoint, charsmax(endpoint));
+
+	new GripJSONValue:data = GripJSONValue:get_param(arg_data);
+	new callback[64], funcId;
+	get_string(arg_callback, callback, charsmax(callback));
+	if (callback[0] != EOS) {
+		funcId = get_func_id(callback, plugin);
+		if (funcId == -1) {
+			log_error(AMX_ERR_NATIVE, "Could not find function %s", callback);
+			return -1;
+		}
+	} else {
+		funcId = INVALID_PLUGIN_ID;
+	}
+
+	return makeRequest(endpoint, data, plugin, funcId, argc >= 4 ? get_param(arg_param) : 0);
+}
+
+public NativeLog(plugin, argc) {
+	CHECK_NATIVE_ARGS_NUM(argc, 2, 0)
+
+	enum { arg_level = 1, arg_fmt, arg_params };
+
+	new message[512];
+	vdformat(message, charsmax(message), arg_fmt, arg_params);
+	logToFile(GmxLogLevel:get_param(arg_level), message);
+	return 1;
 }
 
 public NativeIsLoaded(plugin, argc) {
@@ -580,6 +605,7 @@ public NativeGetSessionId(plugin, argc) {
 
 	return Players[player][PlayerSessionId];
 }
+// End natives
 
 checkAPIVersion() {
 	for(new i, n = get_pluginsnum(), status[2], func; i < n; i++) {
