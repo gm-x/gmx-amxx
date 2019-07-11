@@ -18,6 +18,8 @@ stock const GMX_API_VERSION_STR[] = "0.0.5";
  */
 forward GMX_CfgLoaded();
 
+forward GMX_Init();
+
 forward GMX_PlayerLoading(const id);
 
 forward GMX_PlayerLoaded(const id, GripJSONValue:data);

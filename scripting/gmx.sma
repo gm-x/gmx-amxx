@@ -24,6 +24,7 @@
     }
 
 enum FWD {
+	FWD_Init,
 	FWD_Loading,
 	FWD_Loaded,
 	FWD_Disconnecting,
@@ -105,17 +106,12 @@ public plugin_init() {
 	Functions[FnOnAssigned] = get_func_id("OnAssigned");
 	Functions[FnOnInfoResponse] = get_func_id("OnInfoResponse");
 
-	makeInfoRequest();
-
+	Forwards[FWD_Init] = CreateMultiForward("GMX_Init", ET_IGNORE);
 	Forwards[FWD_Loading] = CreateMultiForward("GMX_PlayerLoading", ET_STOP, FP_CELL);
 	Forwards[FWD_Loaded] = CreateMultiForward("GMX_PlayerLoaded", ET_IGNORE, FP_CELL, FP_CELL);
 	Forwards[FWD_Disconnecting] = CreateMultiForward("GMX_PlayerDisconnecting", ET_STOP, FP_CELL);
 
-	register_srvcmd("gmx_debug", "CmdDebug");
-}
-
-public CmdDebug() {
-	TaskPing();
+	makeInfoRequest();	
 }
 
 public plugin_cfg() {
@@ -236,6 +232,7 @@ public CmdAssing(id) {
 public OnInfoResponse(const GmxResponseStatus:status) {
 	switch (status) {
 		case GmxResponseStatusOk: {
+			ExecuteForward(Forwards[FWD_Init], FReturn);
 			set_task(60.0, "TaskPing", .flags = "b");
 		}
 
