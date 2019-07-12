@@ -8,15 +8,23 @@
 #include <gmx_stocks>
 
 #define GMX_MAJOR_VERSION			0
-#define GMX_MINOR_VERSION			1
-#define GMX_MAINTENANCE_VERSION		1
+#define GMX_MINOR_VERSION			0
+#define GMX_MAINTENANCE_VERSION		5
 
-stock const GMX_API_VERSION_STR[] = "0.1.0";
+stock const GMX_API_VERSION_STR[] = "0.0.5";
 
 /**
  * Called when config was loaded
  */
 forward GMX_CfgLoaded();
+
+forward GMX_Init();
+
+forward GMX_PlayerLoading(const id);
+
+forward GMX_PlayerLoaded(const id, GripJSONValue:data);
+
+forward GMX_PlayerDisconnecting(const id);
 
 /**
  * Make request to API
@@ -40,6 +48,14 @@ native GMX_MakeRequest(const endpoint[], GripJSONValue:data, const callback[], c
  * @return 1 if success, 0 if error occurred
  */
 native GMX_Log(const GmxLogLevel:level, const fmt[], any:...);
+
+native bool:GMX_PlayerIsLoaded(const id);
+
+native GMX_PlayerGetPlayerId(const id);
+
+native GMX_PlayerGetUserId(const id);
+
+native GMX_PlayerGetSessionId(const id);
 
 /*
 * This is callback from GMX Core that gives major/minor versions for verifying compatibility for GMX versions.
