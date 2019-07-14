@@ -6,12 +6,7 @@
 
 #include <gmx_consts>
 #include <gmx_stocks>
-
-#define GMX_MAJOR_VERSION			0
-#define GMX_MINOR_VERSION			0
-#define GMX_MAINTENANCE_VERSION		5
-
-stock const GMX_API_VERSION_STR[] = "0.0.5";
+#include <gmx_version>
 
 /**
  * Called when config was loaded
