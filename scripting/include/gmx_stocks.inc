@@ -14,7 +14,7 @@ stock GMX_GetPlayerByUserID(const userid) {
 	return 0;
 }
 
-stock GMX_GetPlayerBPlayerID(const playerid) {
+stock GMX_GetPlayerByPlayerID(const playerid) {
 	for (new id = 1; id <= MaxClients; id++) {
 		if (is_user_connected(id) && GMX_PlayerIsLoaded(id) && GMX_PlayerGetPlayerId(id) == playerid) {
 			return id;
