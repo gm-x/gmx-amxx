@@ -1,11 +1,11 @@
 # GM-X Amxx plugins
 
-Requires
+Requirements
 =============
 
 - [AmxModX](https://github.com/alliedmodders/amxmodx/) 1.9.0 or higher
 - [GoldSrc Rest In Pawn](https://github.com/In-line/grip) 0.1.5-beta or higher
-- PersistentDataStorage
+- [PersistentDataStorage](https://github.com/gm-x/AMXX-PersistentDataStorage)1.0.0 or higher
 
 Installation
 =============
