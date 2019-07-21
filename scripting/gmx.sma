@@ -395,6 +395,10 @@ loadConfig() {
 	new filePath[128];
 	get_localinfo("amxx_configsdir", filePath, charsmax(filePath));
 	add(filePath, charsmax(filePath), "/gmx.json");
+	if (!file_exists(filePath)) {
+		set_fail_state("Coudn't open %s", filePath);
+	}
+
 	new error[128];
 	new GripJSONValue:cfg = grip_json_parse_file(filePath, error, charsmax(error));
 	if (cfg == Invalid_GripJSONValue) {
