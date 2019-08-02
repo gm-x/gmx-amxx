@@ -9,7 +9,7 @@
 	}
 
 #define CHECK_NATIVE_PLAYER(%1,%2) \
-    if (!is_user_connected(%1)) { \
+    if (!is_user_connected(%1) && !is_user_connecting(%1)) { \
         log_error(AMX_ERR_NATIVE, "Invalid player %d", %1); \
         return %2; \
     }
@@ -93,6 +93,8 @@ public plugin_natives() {
 	register_native("GMX_PP_SetNumber", "NativeSetNumber", 0);
 	register_native("GMX_PP_GetBool", "NativeGetBool", 0);
 	register_native("GMX_PP_SetBool", "NativeSetBool", 0);
+	register_native("GMX_PP_GetFloat", "NativeGetFloat", 0);
+	register_native("GMX_PP_SetFloat", "NativeSetFloat", 0);
 }
 
 public bool:NativeHasKey(plugin, argc) {
@@ -102,10 +104,10 @@ public bool:NativeHasKey(plugin, argc) {
 
 	new player = get_param(arg_player);
 	CHECK_NATIVE_PLAYER(player, false)
-	
+
 	new key[MAX_KEY_LENGTH];
 	get_string(arg_key, key, charsmax(key));
-	
+
 	return TrieKeyExists(PlayersPreferences[player], key);
 }
 
@@ -116,7 +118,7 @@ public NativeGetString(plugin, argc) {
 
 	new player = get_param(arg_player);
 	CHECK_NATIVE_PLAYER(player, false)
-	
+
 	new key[MAX_KEY_LENGTH], value[MAX_VALUE_STRING_LENGTH];
 	get_string(arg_key, key, charsmax(key));
 	if (TrieKeyExists(PlayersPreferences[player], key)) {
@@ -134,18 +136,13 @@ public NativeSetString(plugin, argc) {
 
 	new player = get_param(arg_player);
 	CHECK_NATIVE_PLAYER(player, 0)
-	
+
 	new key[MAX_KEY_LENGTH], value[MAX_VALUE_STRING_LENGTH];
 	get_string(arg_key, key, charsmax(key));
 	get_string(arg_value, value, charsmax(value));
 	TrieSetString(PlayersPreferences[player], key, value);
-	
-	new GripJSONValue:request = grip_json_init_object();
-	grip_json_object_set_string(request, key, value);
-	GMX_MakeRequest("player/preferences", request, "OnSaved", get_user_userid(player));
-	
-	ExecuteForward(Forwards[FWD_PlayerKeyChanged], FwdReturn, player, key);
-	return 1;
+
+	return setValue(player, key, grip_json_init_string(value));
 }
 
 public NativeGetNumber(plugin, argc) {
@@ -155,7 +152,7 @@ public NativeGetNumber(plugin, argc) {
 
 	new player = get_param(arg_player);
 	CHECK_NATIVE_PLAYER(player, 0)
-	
+
 	new key[MAX_KEY_LENGTH];
 	get_string(arg_key, key, charsmax(key));
 	if (!TrieKeyExists(PlayersPreferences[player], key)) {
@@ -174,19 +171,14 @@ public NativeSetNumber(plugin, argc) {
 
 	new player = get_param(arg_player);
 	CHECK_NATIVE_PLAYER(player, 0)
-	
+
 	new key[MAX_KEY_LENGTH];
 	get_string(arg_key, key, charsmax(key));
-	
+
 	new value = get_param(arg_value);
 	TrieSetCell(PlayersPreferences[player], key, value);
-	
-	new GripJSONValue:request = grip_json_init_object();
-	grip_json_object_set_number(request, key, value);
-	GMX_MakeRequest("player/preferences", request, "OnSaved", get_user_userid(player));
 
-	ExecuteForward(Forwards[FWD_PlayerKeyChanged], FwdReturn, player, key);
-	return 1;
+	return setValue(player, key, grip_json_init_number(value));
 }
 
 public bool:NativeGetBool(plugin, argc) {
@@ -196,7 +188,7 @@ public bool:NativeGetBool(plugin, argc) {
 
 	new player = get_param(arg_player);
 	CHECK_NATIVE_PLAYER(player, false)
-	
+
 	new key[MAX_KEY_LENGTH];
 	get_string(arg_key, key, charsmax(key));
 	if (!TrieKeyExists(PlayersPreferences[player], key)) {
@@ -218,16 +210,70 @@ public NativeSetBool(plugin, argc) {
 
 	new player = get_param(arg_player);
 	CHECK_NATIVE_PLAYER(player, 0)
-	
+
 	new key[MAX_KEY_LENGTH];
 	get_string(arg_key, key, charsmax(key));
-	
+
 	new bool:value = bool:get_param(arg_value);
 	TrieSetCell(PlayersPreferences[player], key, value ? 1 : 0);
-	
+
+	return setValue(player, key, grip_json_init_bool(value));
+}
+
+public Float:NativeGetFloat(plugin, argc) {
+	enum { arg_player = 1, arg_key, arg_default };
+
+	CHECK_NATIVE_ARGS_NUM(argc, 2, 0.0)
+
+	new player = get_param(arg_player);
+	CHECK_NATIVE_PLAYER(player, 0.0)
+
+	new key[MAX_KEY_LENGTH];
+	get_string(arg_key, key, charsmax(key));
+	if (!TrieKeyExists(PlayersPreferences[player], key)) {
+		return (argc >= arg_default) ? get_param_f(arg_default) : 0.0;
+	}
+
+	new value;
+	TrieGetCell(PlayersPreferences[player], key, value);
+	return Float:value;
+}
+
+public NativeSetFloat(plugin, argc) {
+	enum { arg_player = 1, arg_key, arg_value };
+
+	CHECK_NATIVE_ARGS_NUM(argc, 3, 0)
+
+	new player = get_param(arg_player);
+	CHECK_NATIVE_PLAYER(player, 0)
+
+	new key[MAX_KEY_LENGTH];
+	get_string(arg_key, key, charsmax(key));
+
+	new Float:value = get_param_f(arg_value);
+	TrieSetCell(PlayersPreferences[player], key, value);
+
+	return setValue(player, key, grip_json_init_number(cell:value));
+}
+
+setValue(const player, const key[], const GripJSONValue:value) {
+	if (!GMX_PlayerIsLoaded(player)) {
+		ExecuteForward(Forwards[FWD_PlayerKeyChanged], FwdReturn, player, key);
+		return 0;
+	}
+
 	new GripJSONValue:request = grip_json_init_object();
-	grip_json_object_set_bool(request, key, value);
-	GMX_MakeRequest("player/preferences", request, "OnSaved", get_user_userid(player));
+	grip_json_object_set_number(request, "player_id", GMX_PlayerGetPlayerId(player));
+
+	new GripJSONValue:data = grip_json_init_object();
+	grip_json_object_set_value(data, key, value);
+	grip_json_object_set_value(request, "data", data);
+
+	GMX_MakeRequest("player/preferences", request);
+
+	grip_destroy_json_value(value);
+	grip_destroy_json_value(data);
+	grip_destroy_json_value(request);
 
 	ExecuteForward(Forwards[FWD_PlayerKeyChanged], FwdReturn, player, key);
 	return 1;

@@ -31,7 +31,7 @@ forward GMX_PlayerDisconnecting(const id);
  *
  * @return ID of request, -1 if error occurred
  */
-native GMX_MakeRequest(const endpoint[], GripJSONValue:data, const callback[], const param = 0);
+native GMX_MakeRequest(const endpoint[], GripJSONValue:data, const callback[] = "", const param = 0);
 
 /**
  * Make request to API
