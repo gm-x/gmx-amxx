@@ -577,8 +577,9 @@ public NativeIsLoaded(plugin, argc) {
 	CHECK_NATIVE_ARGS_NUM(argc, 1, false)
 
 	new player = get_param(arg_player);
-	CHECK_NATIVE_PLAYER(player, false)
-
+	if (player <= 0 || player > MaxClients) {
+		return false;
+	}
 	return bool:CHECK_PLAYER_STATUS(player, STATUS_LOADED);
 }
 

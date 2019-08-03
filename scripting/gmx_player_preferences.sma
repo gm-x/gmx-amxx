@@ -9,7 +9,7 @@
 	}
 
 #define CHECK_NATIVE_PLAYER(%1,%2) \
-    if (!is_user_connected(%1)) { \
+    if (!is_user_connected(%1) || !GMX_PlayerIsLoaded(%1)) { \
         log_error(AMX_ERR_NATIVE, "Invalid player %d", %1); \
         return %2; \
     }
