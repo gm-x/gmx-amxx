@@ -6,7 +6,7 @@
 
 stock GMX_GetPlayerByUserID(const userid) {
 	for (new id = 1; id <= MaxClients; id++) {
-		if ((is_user_connected(id) || is_user_connecting(id)) && get_user_userid(id) == userid) {
+		if (is_user_connected(id) && get_user_userid(id) == userid) {
 			return id;
 		}
 	}
