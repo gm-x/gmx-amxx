@@ -23,6 +23,8 @@
         return %2; \
     }
 
+#define CHECK_PLAYER_STATUS(%1,%2) (Players[%1][PlayerStatus] == %2)
+
 enum FWD {
 	FWD_Init,
 	FWD_Loading,
@@ -58,6 +60,7 @@ new bool:UAC_IsLoaded = false;
 
 enum {
 	STATUS_NONE = 0,
+	STATUS_WAITING,
 	STATUS_LOADING,
 	STATUS_LOADED,
 };
@@ -130,11 +133,11 @@ public plugin_end() {
 }
 
 public PDS_Save() {
-	for (new i = 1, data[2]; i < MaxClients; i++) {
-		if (Players[i][PlayerStatus] == STATUS_LOADED) {
-			data[0] = Players[i][PlayerId];
-			data[1] = Players[i][PlayerSessionId];
-			PDS_SetArray(Players[i][PlayerSteamId], data, sizeof data);
+	for (new player = 1, data[2]; player < MaxClients; player++) {
+		if (CHECK_PLAYER_STATUS(player, STATUS_LOADED)) {
+			data[0] = Players[player][PlayerId];
+			data[1] = Players[player][PlayerSessionId];
+			PDS_SetArray(Players[player][PlayerSteamId], data, sizeof data);
 		}
 	}
 }
@@ -146,8 +149,10 @@ public client_connect(id) {
 public client_putinserver(id) {
 	get_user_authid(id, Players[id][PlayerSteamId], 31);
 #if defined _uac_included
-	if (!UAC_IsLoaded) {
+	if (!UAC_IsLoaded || CHECK_PLAYER_STATUS(id, STATUS_WAITING)) {
 		loadPlayer(id);
+	} else if (UAC_IsLoaded && CHECK_PLAYER_STATUS(id, STATUS_NONE)) {
+		Players[id][PlayerStatus] = STATUS_WAITING;
 	}
 #else
 	loadPlayer(id);
@@ -160,8 +165,18 @@ public UAC_Loaded() {
 }
 
 public UAC_Checked(const id, const UAC_CheckResult:result) {
-	if (result != UAC_CHECK_KICK) {
-		loadPlayer(id);
+	if (result == UAC_CHECK_KICK) {
+		return;
+	}
+
+	switch (Players[id][PlayerStatus]) {
+		case STATUS_NONE: {
+			Players[id][PlayerStatus] = STATUS_WAITING;
+		}
+
+		case STATUS_WAITING: {
+			loadPlayer(id);
+		}
 	}
 }
 #endif
@@ -195,7 +210,7 @@ public TaskPing() {
 
 	new GripJSONValue:sessions = grip_json_init_array();
 	for (new id = 1; id <= MaxClients; id++) {
-		if (Players[id][PlayerStatus] == STATUS_LOADED) {
+		if (CHECK_PLAYER_STATUS(id, STATUS_LOADED)) {
 			grip_json_array_append_number(sessions, Players[id][PlayerSessionId]);
 		}
 	}
@@ -476,7 +491,7 @@ loadPlayer(id) {
 }
 
 bool:canBeLoaded(const id) {
-	return bool:(Players[id][PlayerStatus] == STATUS_NONE && !is_user_bot(id) && !is_user_hltv(id));
+	return bool:(Players[id][PlayerStatus] != STATUS_LOADING && Players[id][PlayerStatus] != STATUS_LOADING && !is_user_bot(id) && !is_user_hltv(id));
 }
 
 callCallback(const pluginId, const funcId, const GmxResponseStatus:status, const GripJSONValue:data, const param) {
@@ -564,7 +579,7 @@ public NativeIsLoaded(plugin, argc) {
 	new player = get_param(arg_player);
 	CHECK_NATIVE_PLAYER(player, false)
 
-	return bool:(Players[player][PlayerStatus] == STATUS_LOADED);
+	return bool:CHECK_PLAYER_STATUS(player, STATUS_LOADED);
 }
 
 public NativeGetPlayerId(plugin, argc) {
