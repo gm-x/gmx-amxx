@@ -1,3 +1,5 @@
+#pragma semicolon 1
+
 #include <amxmodx>
 #include <reapi>
 #include <grip>
@@ -277,14 +279,6 @@ public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const use
 	new GripJSONValue:userIdVal = grip_json_object_get_value(data, "user_id");
 	Players[id][PlayerUserId] = grip_json_get_type(userIdVal) != GripJSONNull ? grip_json_get_number(userIdVal) : 0;
 
-	// if (json_object_has_value(data, "user", JSONObject)) {
-	// 	new JSON:tmp = json_object_get_value(data, "user");
-	// 	Players[id][PlayerUserId] = json_object_has_value(tmp, "id", JSONNumber)
-	// 		? json_object_get_number(tmp, "id")
-	// 		: 0;
-	// 	json_free(tmp);
-	// }
-
 	logToFile(GmxLogDebug, "Player #%d <player: %d> <session: %d> <user: %d> connected to server", userid, Players[id][PlayerId], Players[id][PlayerSessionId], Players[id][PlayerUserId]);
 
 	Players[id][PlayerStatus] = STATUS_LOADED;
@@ -355,7 +349,7 @@ public RequestHandler(const id) {
 			}
 			case GripResponseStateError: {
 				new err[256];
-				grip_get_error_description(err, charsmax(err))
+				grip_get_error_description(err, charsmax(err));
 				logToFile(GmxLogError, "Request %d finished with error: %s", id, err);
 				callCallback(Request[RequestPluginId], Request[RequestFuncId], GmxResponseStatusError, Invalid_GripJSONValue, Request[RequestParam]);
 			}
@@ -393,7 +387,7 @@ public RequestHandler(const id) {
 
 	ArrayGetArray(Requests, id, Request, sizeof Request);
 	new error[128];
-	new GripJSONValue:data = grip_json_parse_response_body(error, charsmax(error))
+	new GripJSONValue:data = grip_json_parse_response_body(error, charsmax(error));
 	if (data == Invalid_GripJSONValue) {
 		logToFile(GmxLogInfo, "Error parse response: %s", error);
 		callCallback(Request[RequestPluginId], Request[RequestFuncId], GmxResponseStatusBadResponse, Invalid_GripJSONValue, Request[RequestParam]);
@@ -514,8 +508,7 @@ logToFile(const GmxLogLevel:level, const msg[], any:...) {
 	new hour, minute, second;
 	time(hour, minute, second);
 
-	server_print("[GMX] %02d:%02d:%02d: %s", hour, minute, second, message)
-	
+	server_print("[GMX] %02d:%02d:%02d: %s", hour, minute, second, message);
 	fprintf(LogFile, "%02d:%02d:%02d: %s^n", hour, minute, second, message);
 	fflush(LogFile);
 }
