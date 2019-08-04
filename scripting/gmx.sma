@@ -589,8 +589,8 @@ public NativeGetPlayerId(plugin, argc) {
 	CHECK_NATIVE_ARGS_NUM(argc, 1, 0)
 
 	new player = get_param(arg_player);
-	CHECK_NATIVE_PLAYER(1, 0)
-	CHECK_NATIVE_PLAYER_LOADED(1, 0)
+	CHECK_NATIVE_PLAYER(player, 0)
+	CHECK_NATIVE_PLAYER_LOADED(player, 0)
 
 	return Players[player][PlayerId];
 }
@@ -601,8 +601,8 @@ public NativeGetUserId(plugin, argc) {
 	CHECK_NATIVE_ARGS_NUM(argc, 1, 0)
 
 	new player = get_param(arg_player);
-	CHECK_NATIVE_PLAYER(1, 0)
-	CHECK_NATIVE_PLAYER_LOADED(1, 0)
+	CHECK_NATIVE_PLAYER(player, 0)
+	CHECK_NATIVE_PLAYER_LOADED(player, 0)
 
 	return Players[player][PlayerUserId];
 }
@@ -613,8 +613,8 @@ public NativeGetSessionId(plugin, argc) {
 	CHECK_NATIVE_ARGS_NUM(argc, 1, 0)
 
 	new player = get_param(arg_player);
-	CHECK_NATIVE_PLAYER(1, 0)
-	CHECK_NATIVE_PLAYER_LOADED(1, 0)
+	CHECK_NATIVE_PLAYER(player, 0)
+	CHECK_NATIVE_PLAYER_LOADED(player, 0)
 
 	return Players[player][PlayerSessionId];
 }
