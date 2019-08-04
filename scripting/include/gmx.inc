@@ -9,47 +9,114 @@
 #include <gmx_version>
 
 /**
- * Called when config was loaded
+ * Called when the config was loaded.
+ *
+ * @noreturn
  */
 forward GMX_CfgLoaded();
 
+/**
+ * Description.
+ *
+ * @noreturn
+ */
 forward GMX_Init();
 
+/**
+ * Called when a player is loading.
+ *
+ * @return              PLUGIN_CONTINUE to let the client load
+ *                      PLUGIN_HANDLED to prevent the client to load
+ */
 forward GMX_PlayerLoading(const id);
 
+/**
+ * Called when a player was loaded.
+ *
+ * @param id            Client index
+ * @param data          --- Description ---
+ *
+ * @noreturn
+ */
 forward GMX_PlayerLoaded(const id, GripJSONValue:data);
 
+/**
+ * Called when a player is disconnecting.
+ *
+ * @return              PLUGIN_CONTINUE to let saving information about player's disconnection
+ *                      PLUGIN_HANDLED to prevent saving information about player's disconnection
+ */
 forward GMX_PlayerDisconnecting(const id);
 
 /**
- * Make request to API
+ * Makes request to API.
  *
- * @param endpoint
- * @param data
- * @param callback
- * @param param
+ * @param endpoint      --- Description ---
+ * @param data          --- Description ---
+ * @param callback      --- Description ---
+ * @param param         --- Description ---
  *
- * @return ID of request, -1 if error occurred
+ * @return              ID of request, -1 if error occurred
+ * @error               If an invalid number of arguments is set, or API is not enabled, or an
+ *                      invalid callback function is provided, an error will be thrown.
  */
-native GMX_MakeRequest(const endpoint[], GripJSONValue:data, const callback[], const param = 0);
+native GMX_MakeRequest(const endpoint[], GripJSONValue:data, const callback[] = "", const param = 0);
 
 /**
- * Make request to API
+ * Makes request to API.
  *
- * @param endpoint
- * @param fmt
- * @param ...
+ * @param level         Logging level
+ * @param fmt           Formatting rules
+ * @param ...           Variable number of formatting parameters
  *
- * @return 1 if success, 0 if error occurred
+ * @return              1 on success, 0 otherwise
  */
 native GMX_Log(const GmxLogLevel:level, const fmt[], any:...);
 
+/**
+ * Checks if player is loaded.
+ *
+ * @param id            Client index
+ *
+ * @return              true if loaded, false otherwise
+ * @error               If an invalid number of arguments is set, an error will be thrown.
+ */
 native bool:GMX_PlayerIsLoaded(const id);
 
+/**
+ * Returns player's ID.
+ *
+ * @param id            Client index
+ *
+ * @return              Player's ID if it was found
+ * @error               If the index is not within the range of 1 to MaxClients,
+ *                      or an invalid number of arguments is set, or player is not
+ *                      loaded, an error will be thrown.
+ */
 native GMX_PlayerGetPlayerId(const id);
 
+/**
+ * Returns player's user ID.
+ *
+ * @param id            Client index
+ *
+ * @return              Player's user ID if it was found
+ * @error               If the index is not within the range of 1 to MaxClients,
+ *                      or an invalid number of arguments is set, or player is not
+ *                      loaded, an error will be thrown.
+ */
 native GMX_PlayerGetUserId(const id);
 
+/**
+ * Returns player's session ID.
+ *
+ * @param id            Client index
+ *
+ * @return              Player's session ID if it was found
+ * @error               If the index is not within the range of 1 to MaxClients,
+ *                      or an invalid number of arguments is set, or player is not
+ *                      loaded, an error will be thrown.
+ */
 native GMX_PlayerGetSessionId(const id);
 
 /*

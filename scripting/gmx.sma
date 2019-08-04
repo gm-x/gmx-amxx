@@ -1,3 +1,5 @@
+#pragma semicolon 1
+
 #include <amxmodx>
 #include <reapi>
 #include <grip>
@@ -22,6 +24,8 @@
         log_error(AMX_ERR_NATIVE, "Player %d not loaded", %1); \
         return %2; \
     }
+
+#define CHECK_PLAYER_STATUS(%1,%2) (Players[%1][PlayerStatus] == %2)
 
 enum FWD {
 	FWD_Init,
@@ -58,6 +62,7 @@ new bool:UAC_IsLoaded = false;
 
 enum {
 	STATUS_NONE = 0,
+	STATUS_WAITING,
 	STATUS_LOADING,
 	STATUS_LOADED,
 };
@@ -130,11 +135,11 @@ public plugin_end() {
 }
 
 public PDS_Save() {
-	for (new i = 1, data[2]; i < MaxClients; i++) {
-		if (Players[i][PlayerStatus] == STATUS_LOADED) {
-			data[0] = Players[i][PlayerId];
-			data[1] = Players[i][PlayerSessionId];
-			PDS_SetArray(Players[i][PlayerSteamId], data, sizeof data);
+	for (new player = 1, data[2]; player < MaxClients; player++) {
+		if (CHECK_PLAYER_STATUS(player, STATUS_LOADED)) {
+			data[0] = Players[player][PlayerId];
+			data[1] = Players[player][PlayerSessionId];
+			PDS_SetArray(Players[player][PlayerSteamId], data, sizeof data);
 		}
 	}
 }
@@ -146,8 +151,10 @@ public client_connect(id) {
 public client_putinserver(id) {
 	get_user_authid(id, Players[id][PlayerSteamId], 31);
 #if defined _uac_included
-	if (!UAC_IsLoaded) {
+	if (!UAC_IsLoaded || CHECK_PLAYER_STATUS(id, STATUS_WAITING)) {
 		loadPlayer(id);
+	} else if (UAC_IsLoaded && CHECK_PLAYER_STATUS(id, STATUS_NONE)) {
+		Players[id][PlayerStatus] = STATUS_WAITING;
 	}
 #else
 	loadPlayer(id);
@@ -160,8 +167,18 @@ public UAC_Loaded() {
 }
 
 public UAC_Checked(const id, const UAC_CheckResult:result) {
-	if (result != UAC_CHECK_KICK) {
-		loadPlayer(id);
+	if (result == UAC_CHECK_KICK) {
+		return;
+	}
+
+	switch (Players[id][PlayerStatus]) {
+		case STATUS_NONE: {
+			Players[id][PlayerStatus] = STATUS_WAITING;
+		}
+
+		case STATUS_WAITING: {
+			loadPlayer(id);
+		}
 	}
 }
 #endif
@@ -195,7 +212,7 @@ public TaskPing() {
 
 	new GripJSONValue:sessions = grip_json_init_array();
 	for (new id = 1; id <= MaxClients; id++) {
-		if (Players[id][PlayerStatus] == STATUS_LOADED) {
+		if (CHECK_PLAYER_STATUS(id, STATUS_LOADED)) {
 			grip_json_array_append_number(sessions, Players[id][PlayerSessionId]);
 		}
 	}
@@ -261,14 +278,6 @@ public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const use
 	Players[id][PlayerSessionId] = grip_json_object_get_number(data, "session_id");
 	new GripJSONValue:userIdVal = grip_json_object_get_value(data, "user_id");
 	Players[id][PlayerUserId] = grip_json_get_type(userIdVal) != GripJSONNull ? grip_json_get_number(userIdVal) : 0;
-
-	// if (json_object_has_value(data, "user", JSONObject)) {
-	// 	new JSON:tmp = json_object_get_value(data, "user");
-	// 	Players[id][PlayerUserId] = json_object_has_value(tmp, "id", JSONNumber)
-	// 		? json_object_get_number(tmp, "id")
-	// 		: 0;
-	// 	json_free(tmp);
-	// }
 
 	logToFile(GmxLogDebug, "Player #%d <player: %d> <session: %d> <user: %d> connected to server", userid, Players[id][PlayerId], Players[id][PlayerSessionId], Players[id][PlayerUserId]);
 
@@ -340,7 +349,7 @@ public RequestHandler(const id) {
 			}
 			case GripResponseStateError: {
 				new err[256];
-				grip_get_error_description(err, charsmax(err))
+				grip_get_error_description(err, charsmax(err));
 				logToFile(GmxLogError, "Request %d finished with error: %s", id, err);
 				callCallback(Request[RequestPluginId], Request[RequestFuncId], GmxResponseStatusError, Invalid_GripJSONValue, Request[RequestParam]);
 			}
@@ -378,7 +387,7 @@ public RequestHandler(const id) {
 
 	ArrayGetArray(Requests, id, Request, sizeof Request);
 	new error[128];
-	new GripJSONValue:data = grip_json_parse_response_body(error, charsmax(error))
+	new GripJSONValue:data = grip_json_parse_response_body(error, charsmax(error));
 	if (data == Invalid_GripJSONValue) {
 		logToFile(GmxLogInfo, "Error parse response: %s", error);
 		callCallback(Request[RequestPluginId], Request[RequestFuncId], GmxResponseStatusBadResponse, Invalid_GripJSONValue, Request[RequestParam]);
@@ -480,7 +489,7 @@ loadPlayer(id) {
 }
 
 bool:canBeLoaded(const id) {
-	return bool:(Players[id][PlayerStatus] == STATUS_NONE && !is_user_bot(id) && !is_user_hltv(id));
+	return bool:(Players[id][PlayerStatus] != STATUS_LOADING && Players[id][PlayerStatus] != STATUS_LOADING && !is_user_bot(id) && !is_user_hltv(id));
 }
 
 callCallback(const pluginId, const funcId, const GmxResponseStatus:status, const GripJSONValue:data, const param) {
@@ -503,8 +512,7 @@ logToFile(const GmxLogLevel:level, const msg[], any:...) {
 	new hour, minute, second;
 	time(hour, minute, second);
 
-	server_print("[GMX] %02d:%02d:%02d: %s", hour, minute, second, message)
-	
+	server_print("[GMX] %02d:%02d:%02d: %s", hour, minute, second, message);
 	fprintf(LogFile, "%02d:%02d:%02d: %s^n", hour, minute, second, message);
 	fflush(LogFile);
 }
@@ -566,9 +574,10 @@ public NativeIsLoaded(plugin, argc) {
 	CHECK_NATIVE_ARGS_NUM(argc, 1, false)
 
 	new player = get_param(arg_player);
-	CHECK_NATIVE_PLAYER(player, false)
-
-	return bool:(Players[player][PlayerStatus] == STATUS_LOADED);
+	if (player <= 0 || player > MaxClients) {
+		return false;
+	}
+	return bool:CHECK_PLAYER_STATUS(player, STATUS_LOADED);
 }
 
 public NativeGetPlayerId(plugin, argc) {
@@ -577,8 +586,8 @@ public NativeGetPlayerId(plugin, argc) {
 	CHECK_NATIVE_ARGS_NUM(argc, 1, 0)
 
 	new player = get_param(arg_player);
-	CHECK_NATIVE_PLAYER(1, 0)
-	CHECK_NATIVE_PLAYER_LOADED(1, 0)
+	CHECK_NATIVE_PLAYER(player, 0)
+	CHECK_NATIVE_PLAYER_LOADED(player, 0)
 
 	return Players[player][PlayerId];
 }
@@ -589,8 +598,8 @@ public NativeGetUserId(plugin, argc) {
 	CHECK_NATIVE_ARGS_NUM(argc, 1, 0)
 
 	new player = get_param(arg_player);
-	CHECK_NATIVE_PLAYER(1, 0)
-	CHECK_NATIVE_PLAYER_LOADED(1, 0)
+	CHECK_NATIVE_PLAYER(player, 0)
+	CHECK_NATIVE_PLAYER_LOADED(player, 0)
 
 	return Players[player][PlayerUserId];
 }
@@ -601,8 +610,8 @@ public NativeGetSessionId(plugin, argc) {
 	CHECK_NATIVE_ARGS_NUM(argc, 1, 0)
 
 	new player = get_param(arg_player);
-	CHECK_NATIVE_PLAYER(1, 0)
-	CHECK_NATIVE_PLAYER_LOADED(1, 0)
+	CHECK_NATIVE_PLAYER(player, 0)
+	CHECK_NATIVE_PLAYER_LOADED(player, 0)
 
 	return Players[player][PlayerSessionId];
 }
