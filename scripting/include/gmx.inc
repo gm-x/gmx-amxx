@@ -74,6 +74,27 @@ native GMX_MakeRequest(const endpoint[], GripJSONValue:data, const callback[] = 
 native GMX_Log(const GmxLogLevel:level, const fmt[], any:...);
 
 /**
+ * Returns server ID
+ *
+ * @return              server ID
+ */
+native GMX_GetServerID();
+
+/**
+ * Returns time on api part in unix timestamp
+ *
+ * @return              unix timestamp
+ */
+native GMX_GetServerTime();
+
+/**
+ * Returns diff from server time and api part time in seconds
+ *
+ * @return              seconds
+ */
+native GMX_GetServerTimeDiff();
+
+/**
  * Checks if player is loaded.
  *
  * @param id            Client index

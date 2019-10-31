@@ -67,6 +67,12 @@ enum {
 	STATUS_LOADED,
 };
 
+enum _:SERVER {
+	ServerID,
+	ServerTime,
+	ServerTimeDiff
+};
+
 enum _:PLAYER {
 	PlayerStatus,
 	PlayerId,
@@ -74,6 +80,8 @@ enum _:PLAYER {
 	PlayerSessionId,
 	PlayerSteamId[32]
 };
+
+new ServerData[SERVER];
 new Players[MAX_PLAYERS + 1][PLAYER];
 
 // Begin forwards
@@ -246,18 +254,27 @@ public CmdAssing(id) {
 // End forwards
 
 // Begin callbacks
-public OnInfoResponse(const GmxResponseStatus:status) {
-	switch (status) {
-		case GmxResponseStatusOk: {
-			ExecuteForward(Forwards[FWD_Init], FReturn);
-			set_task(60.0, "TaskPing", .flags = "b");
-		}
-
-		case GmxResponseStatusBadToken: {
-			ApiEnabled = false;
-			logToFile(GmxLogError, "Bad token. Change valid in gmx.json and reload config");
-		}
+public OnInfoResponse(const GmxResponseStatus:status, GripJSONValue:data) {
+	if (status == GmxResponseStatusBadToken) {
+		ApiEnabled = false;
+		logToFile(GmxLogError, "Bad token. Change valid in gmx.json and reload config");
+		return;
 	}
+
+	if (status != GmxResponseStatusOk) {
+		return;
+	}
+
+	ExecuteForward(Forwards[FWD_Init], FReturn);
+	set_task(60.0, "TaskPing", .flags = "b");
+
+	if (grip_json_get_type(data) != GripJSONObject) {
+		return;
+	}
+
+	ServerData[ServerID] = grip_json_object_get_number(data, "server_id");
+	ServerData[ServerTime] = grip_json_object_get_number(data, "time");
+	ServerData[ServerTimeDiff] = get_systime(0) - ServerData[ServerTime];
 }
 
 public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const userid) {
@@ -522,6 +539,9 @@ logToFile(const GmxLogLevel:level, const msg[], any:...) {
 public plugin_natives() {
 	register_native("GMX_MakeRequest", "NativeMakeRequest", 0);
 	register_native("GMX_Log", "NativeLog", 0);
+	register_native("GMX_GetServerID", "NativeGetServerID", 0);
+	register_native("GMX_GetServerTime", "NativeGetServerTime", 0);
+	register_native("GMX_GetServerTimeDiff", "NativeGetServerTimeDiff", 0);
 	register_native("GMX_PlayerIsLoaded", "NativeIsLoaded", 0);
 	register_native("GMX_PlayerGetPlayerId", "NativeGetPlayerId", 0);
 	register_native("GMX_PlayerGetUserId", "NativeGetUserId", 0);
@@ -566,6 +586,18 @@ public NativeLog(plugin, argc) {
 	vdformat(message, charsmax(message), arg_fmt, arg_params);
 	logToFile(GmxLogLevel:get_param(arg_level), message);
 	return 1;
+}
+
+public NativeGetServerID() {
+	return ServerData[ServerID];
+}
+
+public NativeGetServerTime() {
+	return ServerData[ServerTime];
+}
+
+public NativeGetServerTimeDiff() {
+	return ServerData[ServerTimeDiff];
 }
 
 public NativeIsLoaded(plugin, argc) {
