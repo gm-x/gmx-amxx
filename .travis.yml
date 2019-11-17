@@ -11,4 +11,4 @@ deploy:
   on:
     tags: false
     branch: master
-before_deploy: bash deploy.sh
+script: bash deploy.sh
