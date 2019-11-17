@@ -1,6 +1,6 @@
+language: c
 git:
   depth: false
-
 deploy:
   provider: releases
   api_key: "$GH_TOKEN"
