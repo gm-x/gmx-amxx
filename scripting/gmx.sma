@@ -86,11 +86,7 @@ new Players[MAX_PLAYERS + 1][PLAYER];
 
 // Begin forwards
 public plugin_precache() {
-	PluginId = register_plugin(
-		"GMX Core",
-		fmt("%d.%d.%d", GMX_MAJOR_VERSION, GMX_MINOR_VERSION, GMX_MAINTENANCE_VERSION), 
-		"GM-X Team"
-	);
+	PluginId = register_plugin("GMX Core", GMX_VERSION_STR, "GM-X Team");
 
 	new path[128];
 	get_localinfo("amxx_logs", path, charsmax(path));

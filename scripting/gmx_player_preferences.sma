@@ -30,6 +30,8 @@ new Forwards[FWD], FwdReturn;
 new Trie:PlayersPreferences[MAX_PLAYERS + 1];
 
 public plugin_init() {
+	register_plugin("GMX Player Preferences", GMX_VERSION_STR, "GM-X Team");
+
 	arrayset(PlayersPreferences, Invalid_Trie, sizeof PlayersPreferences);
 	
 	Forwards[FWD_PlayerLoading] = CreateMultiForward("GMX_PP_PlayerLoading", ET_IGNORE, FP_CELL);
