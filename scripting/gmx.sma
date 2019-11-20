@@ -473,9 +473,10 @@ loadPlayer(id) {
 	get_user_name(id, nick, charsmax(nick));
 	get_user_ip(id, ip, charsmax(ip), 1);
 
-	new emulator = has_reunion()
-		? REU_GetProtocol(id)
-		: 0;
+	new emulator = 0;
+	if (has_reunion()) {
+		emulator = _:REU_GetAuthtype(id);
+	}
 
 	new GripJSONValue:data = grip_json_init_object();
 	grip_json_object_set_number(data, "emulator", emulator);
