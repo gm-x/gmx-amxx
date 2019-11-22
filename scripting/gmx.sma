@@ -246,6 +246,7 @@ public CmdAssing(id) {
 	grip_json_object_set_string(data, "token", token);
 	makeRequest("player/assign", data, PluginId, Functions[FnOnAssigned], get_user_userid(id));
 	grip_destroy_json_value(data);
+	return PLUGIN_HANDLED;
 }
 // End forwards
 
