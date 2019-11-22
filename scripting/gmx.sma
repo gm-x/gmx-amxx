@@ -107,7 +107,7 @@ public plugin_precache() {
 
 public plugin_init() {
 	register_concmd("gmx_reloadcfg", "CmdReloadConfig", ADMIN_RCON);
-	register_clcmd("gmx_assign", "CmdAssing");
+	register_clcmd("gmx_assign", "CmdAssign");
 
 	RegisterHookChain(RH_SV_DropClient, "SV_DropClient_Post", true);
 
@@ -237,7 +237,7 @@ public CmdReloadConfig(id, level) {
 	return PLUGIN_HANDLED;
 }
 
-public CmdAssing(id) {
+public CmdAssign(id) {
 	new token[36];
 	read_args(token, charsmax(token));
 	remove_quotes(token);
@@ -246,6 +246,7 @@ public CmdAssing(id) {
 	grip_json_object_set_string(data, "token", token);
 	makeRequest("player/assign", data, PluginId, Functions[FnOnAssigned], get_user_userid(id));
 	grip_destroy_json_value(data);
+	return PLUGIN_HANDLED;
 }
 // End forwards
 
