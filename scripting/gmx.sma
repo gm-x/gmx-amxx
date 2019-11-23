@@ -27,6 +27,9 @@
 
 #define CHECK_PLAYER_STATUS(%1,%2) (Players[%1][PlayerStatus] == %2)
 
+const Float:CMD_DELAY = 0.8;
+const ATTEMPTS_COUNT = 3;
+
 enum FWD {
 	FWD_Init,
 	FWD_Loading,
@@ -78,7 +81,9 @@ enum _:PLAYER {
 	PlayerId,
 	PlayerUserId,
 	PlayerSessionId,
-	PlayerSteamId[32]
+	PlayerSteamId[32],
+	Float:PlayerFloodTime,
+	PlayerAttemptsCount	
 };
 
 new ServerData[SERVER];
@@ -238,6 +243,22 @@ public CmdReloadConfig(id, level) {
 }
 
 public CmdAssign(id) {
+	new Float:gametime = get_gametime();
+	if(gametime < Players[id][PlayerFloodTime] + CMD_DELAY) {
+		if(++Players[id][PlayerAttemptsCount] >= ATTEMPTS_COUNT) {
+			console_print(id, "Stop flooding the server by sending a command!");
+			return PLUGIN_HANDLED;
+		}
+	} else if (Players[id][PlayerAttemptsCount]) {
+		Players[id][PlayerAttemptsCount] = 0;
+	}
+	Players[id][PlayerFloodTime] = gametime;
+
+	if(Players[id][PlayerStatus] == STATUS_LOADED && Players[id][PlayerId]) {
+		console_print(id, "Access has already been granted!");
+		return PLUGIN_HANDLED;
+	}
+
 	new token[36];
 	read_args(token, charsmax(token));
 	remove_quotes(token);
