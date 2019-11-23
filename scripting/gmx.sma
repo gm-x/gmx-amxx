@@ -82,8 +82,8 @@ enum _:PLAYER {
 	PlayerUserId,
 	PlayerSessionId,
 	PlayerSteamId[32],
-    Float:PlayerFloodTime,
-    PlayerAttemptsCount	
+	Float:PlayerFloodTime,
+	PlayerAttemptsCount	
 };
 
 new ServerData[SERVER];
