@@ -171,29 +171,3 @@ parseList(const GripJSONValue:data) {
 	ExecuteForward(fwd, ret);
 	DestroyForward(fwd);
 }
-
-/*
-
-public bool:NativeHasAccess(const plugin, const argc) {
-	enum { arg_player = 1, arg_key };
-
-	if (argc < arg_key) {
-		log_error(AMX_ERR_NATIVE, "Invalid num of arguments %d. Expected %d", argc, arg_key);
-		return false;
-	}
-
-	new player = get_param(arg_player);
-	if (!is_user_connected(player) || !GMX_PlayerIsLoaded(player)) {
-        log_error(AMX_ERR_NATIVE, "Invalid player %d", player);
-        return false;
-    }
-
-	if (PlayersAccess[player] == Invalid_Array) {
-		return false;
-	}
-
-	new key[MAX_KEY_LENGTH];
-	get_string(arg_key, key, charsmax(key));
-	return bool:(ArrayFindString(PlayersAccess[player], key) != -1);
-}
-*/
