@@ -5,6 +5,7 @@
 #include <grip>
 #include <PersistentDataStorage>
 #include <gmx>
+#include <gmx_stocks>
 #tryinclude <uac>
 
 #define CHECK_NATIVE_ARGS_NUM(%1,%2,%3) \

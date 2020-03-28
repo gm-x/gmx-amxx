@@ -5,7 +5,6 @@
 #define _gmx_included
 
 #include <gmx_consts>
-#include <gmx_stocks>
 #include <gmx_version>
 
 /**
