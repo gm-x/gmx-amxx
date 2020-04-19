@@ -139,6 +139,18 @@ native GMX_PlayerGetUserId(const id);
  */
 native GMX_PlayerGetSessionId(const id);
 
+/**
+ * Returns player's immunity level.
+ *
+ * @param id            Client index
+ *
+ * @return              Player's immunity level if it was found
+ * @error               If the index is not within the range of 1 to MaxClients,
+ *                      or an invalid number of arguments is set, or player is not
+ *                      loaded, an error will be thrown.
+ */
+native GMX_PlayerGetImmunity(const id);
+
 /*
 * This is callback from GMX Core that gives major/minor versions for verifying compatibility for GMX versions.
 * Do not modify this!

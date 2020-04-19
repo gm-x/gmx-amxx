@@ -82,6 +82,7 @@ enum _:PLAYER {
 	PlayerId,
 	PlayerUserId,
 	PlayerSessionId,
+	PlayerImmunity,
 	PlayerSteamId[32],
 	Float:PlayerFloodTime,
 	PlayerAttemptsCount	
@@ -145,10 +146,11 @@ public plugin_end() {
 }
 
 public PDS_Save() {
-	for (new player = 1, data[2]; player < MaxClients; player++) {
+	for (new player = 1, data[3]; player < MaxClients; player++) {
 		if (CHECK_PLAYER_STATUS(player, STATUS_LOADED)) {
 			data[0] = Players[player][PlayerId];
 			data[1] = Players[player][PlayerSessionId];
+			data[2] = Players[player][PlayerImmunity];
 			PDS_SetArray(Players[player][PlayerSteamId], data, sizeof data);
 		}
 	}
@@ -312,16 +314,24 @@ public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const use
 
 	Players[id][PlayerId] = grip_json_object_get_number(data, "player_id");
 	Players[id][PlayerSessionId] = grip_json_object_get_number(data, "session_id");
-	new GripJSONValue:userIdVal = grip_json_object_get_value(data, "user_id");
-	Players[id][PlayerUserId] = grip_json_get_type(userIdVal) != GripJSONNull ? grip_json_get_number(userIdVal) : 0;
+
+	new GripJSONValue:tmp;
+	tmp = grip_json_object_get_value(data, "user_id");
+	Players[id][PlayerUserId] = grip_json_get_type(tmp) == GripJSONNumber ? grip_json_get_number(tmp) : 0;
+	grip_destroy_json_value(tmp);
+
+	tmp = grip_json_object_get_value(data, "immunity");
+	Players[id][PlayerImmunity] = grip_json_get_type(tmp) == GripJSONNumber ? grip_json_get_number(tmp) : 0;
+	grip_destroy_json_value(tmp);	
 
 	logToFile(GmxLogDebug, "Player #%d <player: %d> <session: %d> <user: %d> connected to server", userid, Players[id][PlayerId], Players[id][PlayerSessionId], Players[id][PlayerUserId]);
 
 	Players[id][PlayerStatus] = STATUS_LOADED;
 
-	new stored[2];
+	new stored[3];
 	stored[0] = Players[id][PlayerId];
 	stored[1] = Players[id][PlayerSessionId];
+	stored[2] = Players[id][PlayerImmunity];
 	PDS_SetArray(Players[id][PlayerSteamId], stored, sizeof stored);
 
 	ExecuteForward(Forwards[FWD_Loaded], FReturn, id, data);
@@ -507,10 +517,13 @@ loadPlayer(id) {
 	grip_json_object_set_string(data, "nick", nick);
 	grip_json_object_set_string(data, "ip", ip);
 
-	new stored[2];
+	new stored[3];
 	if (PDS_GetArray(steamid, stored, sizeof stored)) {
 		grip_json_object_set_number(data, "id", stored[0]);
 		grip_json_object_set_number(data, "session_id", stored[1]);
+		Players[id][PlayerId] = stored[0];
+		Players[id][PlayerSessionId] = stored[1];
+		Players[id][PlayerImmunity] = stored[2];
 	} else {
 		stored[0] = 0;
 		stored[1] = 0;
@@ -566,6 +579,7 @@ public plugin_natives() {
 	register_native("GMX_PlayerGetPlayerId", "NativeGetPlayerId", 0);
 	register_native("GMX_PlayerGetUserId", "NativeGetUserId", 0);
 	register_native("GMX_PlayerGetSessionId", "NativeGetSessionId", 0);
+	register_native("GMX_PlayerGetImmunity", "NativeGetImmunity", 0);
 }
 
 public NativeMakeRequest(plugin, argc) {
@@ -666,6 +680,18 @@ public NativeGetSessionId(plugin, argc) {
 	CHECK_NATIVE_PLAYER_LOADED(player, 0)
 
 	return Players[player][PlayerSessionId];
+}
+
+public NativeGetImmunity(plugin, argc) {
+	enum { arg_player = 1 };
+
+	CHECK_NATIVE_ARGS_NUM(argc, 1, 0)
+
+	new player = get_param(arg_player);
+	CHECK_NATIVE_PLAYER(player, 0)
+	CHECK_NATIVE_PLAYER_LOADED(player, 0)
+
+	return Players[player][PlayerImmunity];
 }
 // End natives
 
