@@ -5,7 +5,7 @@
 new BasePath[64];
 
 public plugin_precache() {
-	register_plugin("GMX Cache", GMX_VERSION_STR, "GM-X Team");
+	register_plugin("GM-X Cache", GMX_VERSION_STR, "GM-X Team");
 
 	get_localinfo("amxx_datadir", BasePath, charsmax(BasePath));
 	add(BasePath, charsmax(BasePath), "/gmx_cache");

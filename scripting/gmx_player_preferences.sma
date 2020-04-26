@@ -30,7 +30,7 @@ new Forwards[FWD], FwdReturn;
 new Trie:PlayersPreferences[MAX_PLAYERS + 1];
 
 public plugin_init() {
-	register_plugin("GMX Player Preferences", GMX_VERSION_STR, "GM-X Team");
+	register_plugin("GM-X Player Preferences", GMX_VERSION_STR, "GM-X Team");
 
 	arrayset(PlayersPreferences, Invalid_Trie, sizeof PlayersPreferences);
 	

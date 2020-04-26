@@ -4,6 +4,9 @@
 
 #define _gmx_consts_included
 
+const GMX_MAX_COMMAND_LENGTH = 32;
+const GMX_MAX_COMMAND_DATA_LENGTH = 64;
+
 enum GmxResponseStatus {
 	GmxResponseStatusOk,
 	GmxResponseStatusCanceled,

@@ -50,16 +50,28 @@ forward GMX_PlayerDisconnecting(const id);
 /**
  * Makes request to API.
  *
- * @param endpoint      --- Description ---
- * @param data          --- Description ---
- * @param callback      --- Description ---
- * @param param         --- Description ---
+ * @param endpoint      Part of path to api resource
+ * @param data          Data provided to API
+ * @param callback      Callback name which will be called
+ * @param param         Parameter which will be provided in callback
  *
  * @return              ID of request, -1 if error occurred
  * @error               If an invalid number of arguments is set, or API is not enabled, or an
  *                      invalid callback function is provided, an error will be thrown.
  */
 native GMX_MakeRequest(const endpoint[], GripJSONValue:data, const callback[] = "", const param = 0);
+
+/**
+ * Makes request to API.
+ *
+ * @param command       Command name
+ * @param callback      Callback name which will be called
+ *
+ * @return              ID of command, -1 if error occurred
+ * @error               If an invalid number of arguments is set, or an
+ *                      invalid callback function is provided, an error will be thrown.
+ */
+native GMX_RegisterCommand(const command[], const callback[]);
 
 /**
  * Makes request to API.
