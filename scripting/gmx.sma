@@ -45,6 +45,7 @@ enum FUNC {
 	FnOnConnected,
 	FnOnAssigned,
 	FnOnInfoResponse,
+	FnOnPing,
 }
 
 new Functions[FUNC];
@@ -55,10 +56,16 @@ enum _:REQUEST {
 	RequestParam,
 };
 
+enum _:COMMAND {
+	CommandName[GMX_MAX_COMMAND_LENGTH],
+	CommandFwd,
+};
+
 new PluginId, bool:ApiEnabled = true, LogFile;
 new Token[65], Url[256], GmxLogLevel:LogLvl;
 new GripRequestOptions:RequestOptions = Empty_GripRequestOptions;
 new Array:Requests = Invalid_Array, Request[REQUEST];
+new Array:Commands, Command[COMMAND];
 
 #if defined _uac_included
 new bool:UAC_IsLoaded = false;
@@ -93,7 +100,9 @@ new Players[MAX_PLAYERS + 1][PLAYER];
 
 // Begin forwards
 public plugin_precache() {
-	PluginId = register_plugin("GMX Core", GMX_VERSION_STR, "GM-X Team");
+	PluginId = register_plugin("GM-X Core", GMX_VERSION_STR, "GM-X Team");
+
+	Commands = ArrayCreate(COMMAND, 0);
 
 	new path[128];
 	get_localinfo("amxx_logs", path, charsmax(path));
@@ -121,6 +130,7 @@ public plugin_init() {
 	Functions[FnOnConnected] = get_func_id("OnConnected");
 	Functions[FnOnAssigned] = get_func_id("OnAssigned");
 	Functions[FnOnInfoResponse] = get_func_id("OnInfoResponse");
+	Functions[FnOnPing] = get_func_id("OnPing");
 
 	Forwards[FWD_Init] = CreateMultiForward("GMX_Init", ET_IGNORE);
 	Forwards[FWD_Loading] = CreateMultiForward("GMX_PlayerLoading", ET_STOP, FP_CELL);
@@ -135,6 +145,7 @@ public plugin_cfg() {
 }
 
 public plugin_end() {
+	ArrayDestroy(Commands);
 	if (Requests != Invalid_Array) {
 		ArrayDestroy(Requests);
 	}
@@ -230,7 +241,7 @@ public TaskPing() {
 	}
 	grip_json_object_set_value(data, "sessions", sessions);
 
-	makeRequest("server/ping", data);
+	makeRequest("server/ping", data, PluginId, Functions[FnOnPing]);
 	grip_destroy_json_value(sessions);
 	grip_destroy_json_value(data);
 }
@@ -289,7 +300,7 @@ public OnInfoResponse(const GmxResponseStatus:status, GripJSONValue:data) {
 	ExecuteForward(Forwards[FWD_Init], FReturn);
 	set_task(60.0, "TaskPing", .flags = "b");
 
-	if (grip_json_get_type(data) != GripJSONObject) {
+	if (!data || grip_json_get_type(data) != GripJSONObject) {
 		return;
 	}
 
@@ -308,7 +319,7 @@ public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const use
 		return;
 	}
 
-	if (grip_json_get_type(data) != GripJSONObject) {
+	if (!data || grip_json_get_type(data) != GripJSONObject) {
 		return;
 	}
 
@@ -337,6 +348,56 @@ public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const use
 	ExecuteForward(Forwards[FWD_Loaded], FReturn, id, data);
 }
 
+public OnPing(const GmxResponseStatus:status, GripJSONValue:data) {
+	if (status == GmxResponseStatusBadToken) {
+		ApiEnabled = false;
+		logToFile(GmxLogError, "Bad token. Change valid in gmx.json and reload config");
+		return;
+	}
+
+	if (!data || grip_json_get_type(data) != GripJSONObject) {
+		return;
+	}
+
+	new GripJSONValue:commands = grip_json_object_get_value(data, "commands");
+	if (grip_json_get_type(commands) != GripJSONArray) {
+		grip_destroy_json_value(commands);
+		return;
+	}
+
+	// TODO: move to another function
+	new command[GMX_MAX_COMMAND_LENGTH], data[GMX_MAX_COMMAND_DATA_LENGTH];
+	new commandsNum = ArraySize(Commands);
+	for (new i = 0, n = grip_json_array_get_count(commands), GripJSONValue:tmp, GripJSONValue:value, j, ret; i < n; i++) {
+		tmp = grip_json_array_get_value(commands, i);
+		if (grip_json_get_type(tmp) != GripJSONObject) {
+			grip_destroy_json_value(tmp);
+			continue;
+		}
+
+		grip_json_object_get_string(tmp, "command", command, charsmax(command));
+		value = grip_json_object_get_value(tmp, "data");
+		arrayset(data, 0, sizeof data);
+		if (grip_json_get_type(value) != GripJSONString) {
+			grip_destroy_json_value(value);
+			grip_destroy_json_value(tmp);
+			continue;
+		}
+
+		grip_json_get_string(value, data, charsmax(data));
+		grip_destroy_json_value(value);
+		grip_destroy_json_value(tmp);
+
+		for (j = 0; j < commandsNum; j++) {
+			ArrayGetArray(Commands, j, Command, sizeof Command);
+			if (strcmp(Command[CommandName], command) == 0) {
+				ExecuteForward(Command[CommandFwd], ret, data);
+			}
+		}
+	}
+	grip_destroy_json_value(commands);
+}
+
 public OnAssigned(const GmxResponseStatus:status, GripJSONValue:data, const userid) {
 	if (status != GmxResponseStatusOk) {
 		return;
@@ -347,7 +408,7 @@ public OnAssigned(const GmxResponseStatus:status, GripJSONValue:data, const user
 		return;
 	}
 
-	if (grip_json_get_type(data) != GripJSONObject) {
+	if (!data || grip_json_get_type(data) != GripJSONObject) {
 		return;
 	}
 
@@ -571,6 +632,7 @@ logToFile(const GmxLogLevel:level, const msg[], any:...) {
 // Begin natives
 public plugin_natives() {
 	register_native("GMX_MakeRequest", "NativeMakeRequest", 0);
+	register_native("GMX_RegisterCommand", "NativeRegisterCommand", 0);
 	register_native("GMX_Log", "NativeLog", 0);
 	register_native("GMX_GetServerID", "NativeGetServerID", 0);
 	register_native("GMX_GetServerTime", "NativeGetServerTime", 0);
@@ -582,15 +644,14 @@ public plugin_natives() {
 	register_native("GMX_PlayerGetImmunity", "NativeGetImmunity", 0);
 }
 
-public NativeMakeRequest(plugin, argc) {
-	CHECK_NATIVE_ARGS_NUM(argc, 3, -1)
-
+public NativeMakeRequest(const plugin, const argc) {
 	if (!ApiEnabled) {
 		log_error(AMX_ERR_NATIVE, "API is not enabled. Please check log files");
 		return -1;
 	}
 
 	enum { arg_endpoint = 1, arg_data, arg_callback, arg_param };
+	CHECK_NATIVE_ARGS_NUM(argc, arg_callback, -1)
 
 	new endpoint[128];
 	get_string(arg_endpoint, endpoint, charsmax(endpoint));
@@ -611,10 +672,30 @@ public NativeMakeRequest(plugin, argc) {
 	return makeRequest(endpoint, data, plugin, funcId, argc >= 4 ? get_param(arg_param) : 0);
 }
 
-public NativeLog(plugin, argc) {
-	CHECK_NATIVE_ARGS_NUM(argc, 2, 0)
+public NativeRegisterCommand(const plugin, const argc) {
+	enum { arg_command = 1, arg_callback };
+	CHECK_NATIVE_ARGS_NUM(argc, arg_callback, -1)
 
+	get_string(arg_command, Command[CommandName], charsmax(Command[CommandName]));
+	if (Command[CommandName][0] == EOS) {
+		log_error(AMX_ERR_NATIVE, "Invalid name %s", Command[CommandName]);
+		return -1;
+	}
+
+	new callback[64];
+	get_string(arg_callback, callback, charsmax(callback));
+	Command[CommandFwd] = CreateOneForward(plugin, callback, FP_STRING);
+	if (Command[CommandFwd] == -1) {
+		log_error(AMX_ERR_NATIVE, "Could not find function %s", callback);
+		return -1;
+	}
+
+	return ArrayPushArray(Commands, Command, sizeof Command);
+}
+
+public NativeLog(const plugin, const argc) {
 	enum { arg_level = 1, arg_fmt, arg_params };
+	CHECK_NATIVE_ARGS_NUM(argc, arg_fmt, 0)
 
 	new message[512];
 	vdformat(message, charsmax(message), arg_fmt, arg_params);
@@ -634,10 +715,9 @@ public NativeGetServerTimeDiff() {
 	return ServerData[ServerTimeDiff];
 }
 
-public NativeIsLoaded(plugin, argc) {
+public NativeIsLoaded(const plugin, const argc) {
 	enum { arg_player = 1 };
-
-	CHECK_NATIVE_ARGS_NUM(argc, 1, false)
+	CHECK_NATIVE_ARGS_NUM(argc, arg_player, false)
 
 	new player = get_param(arg_player);
 	if (player <= 0 || player > MaxClients) {
@@ -646,10 +726,9 @@ public NativeIsLoaded(plugin, argc) {
 	return bool:CHECK_PLAYER_STATUS(player, STATUS_LOADED);
 }
 
-public NativeGetPlayerId(plugin, argc) {
+public NativeGetPlayerId(const plugin, const argc) {
 	enum { arg_player = 1 };
-
-	CHECK_NATIVE_ARGS_NUM(argc, 1, 0)
+	CHECK_NATIVE_ARGS_NUM(argc, arg_player, 0)
 
 	new player = get_param(arg_player);
 	CHECK_NATIVE_PLAYER(player, 0)
@@ -658,10 +737,9 @@ public NativeGetPlayerId(plugin, argc) {
 	return Players[player][PlayerId];
 }
 
-public NativeGetUserId(plugin, argc) {
+public NativeGetUserId(const plugin, const argc) {
 	enum { arg_player = 1 };
-
-	CHECK_NATIVE_ARGS_NUM(argc, 1, 0)
+	CHECK_NATIVE_ARGS_NUM(argc, arg_player, 0)
 
 	new player = get_param(arg_player);
 	CHECK_NATIVE_PLAYER(player, 0)
@@ -670,10 +748,9 @@ public NativeGetUserId(plugin, argc) {
 	return Players[player][PlayerUserId];
 }
 
-public NativeGetSessionId(plugin, argc) {
+public NativeGetSessionId(const plugin, const argc) {
 	enum { arg_player = 1 };
-
-	CHECK_NATIVE_ARGS_NUM(argc, 1, 0)
+	CHECK_NATIVE_ARGS_NUM(argc, arg_player, 0)
 
 	new player = get_param(arg_player);
 	CHECK_NATIVE_PLAYER(player, 0)
@@ -682,10 +759,9 @@ public NativeGetSessionId(plugin, argc) {
 	return Players[player][PlayerSessionId];
 }
 
-public NativeGetImmunity(plugin, argc) {
+public NativeGetImmunity(const plugin, const argc) {
 	enum { arg_player = 1 };
-
-	CHECK_NATIVE_ARGS_NUM(argc, 1, 0)
+	CHECK_NATIVE_ARGS_NUM(argc, arg_player, 0)
 
 	new player = get_param(arg_player);
 	CHECK_NATIVE_PLAYER(player, 0)

@@ -11,7 +11,7 @@ const MAX_KEY_LENGTH = 32;
 new Array:Keys, Array:Access, Count;
 
 public plugin_init() {
-	register_plugin("GMX Access", GMX_VERSION_STR, "GM-X Team");
+	register_plugin("GM-X Access", GMX_VERSION_STR, "GM-X Team");
 
 	Keys = ArrayCreate(MAX_KEY_LENGTH, 0);
 	Access = ArrayCreate(32, 0);
