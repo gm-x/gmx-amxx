@@ -512,18 +512,18 @@ loadConfig() {
 	get_localinfo("amxx_configsdir", filePath, charsmax(filePath));
 	add(filePath, charsmax(filePath), "/gmx.json");
 	if (!file_exists(filePath)) {
-		set_fail_state("Coudn't open %s", filePath);
+		set_fail_state("Could not open %s", filePath);
 	}
 
 	new error[128];
 	new GripJSONValue:cfg = grip_json_parse_file(filePath, error, charsmax(error));
 	if (cfg == Invalid_GripJSONValue) {
-		set_fail_state("Coudn't open %s. Error %s", filePath, error);
+		set_fail_state("Could not open %s. Error %s", filePath, error);
 	}
 
 	if (grip_json_get_type(cfg) != GripJSONObject) {
 		grip_destroy_json_value(cfg);
-		set_fail_state("Coudn't open %s. Bad format", filePath);
+		set_fail_state("Could not open %s. Bad format", filePath);
 	}
 
 	grip_json_object_get_string(cfg, "token", Token, charsmax(Token));
