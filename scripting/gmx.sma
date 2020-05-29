@@ -289,7 +289,7 @@ public CmdAssign(id) {
 public OnInfoResponse(const GmxResponseStatus:status, GripJSONValue:data) {
 	if (status == GmxResponseStatusBadToken) {
 		ApiEnabled = false;
-		logToFile(GmxLogError, "Bad token. Change valid in gmx.json and reload config");
+		logToFile(GmxLogError, "Bad token. Change to a valid one in gmx.json and reload the config");
 		return;
 	}
 
@@ -351,7 +351,7 @@ public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const use
 public OnPing(const GmxResponseStatus:status, GripJSONValue:data) {
 	if (status == GmxResponseStatusBadToken) {
 		ApiEnabled = false;
-		logToFile(GmxLogError, "Bad token. Change valid in gmx.json and reload config");
+		logToFile(GmxLogError, "Bad token. Change to a valid one in gmx.json and reload the config");
 		return;
 	}
 
@@ -531,7 +531,7 @@ loadConfig() {
 	LogLvl = GmxLogLevel:grip_json_object_get_number(cfg, "loglevel");
 	grip_destroy_json_value(cfg);
 
-	logToFile(GmxLogInfo, "Load configuration. URL is '%s'", Url);
+	logToFile(GmxLogInfo, "Loading configuration. URL is '%s'", Url);
 
 	new fwd = CreateMultiForward("GMX_CfgLoaded", ET_IGNORE);
 	new ret;
