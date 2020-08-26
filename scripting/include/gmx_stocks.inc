@@ -23,3 +23,7 @@ stock GMX_GetPlayerByPlayerID(const playerid) {
 
 	return 0;
 }
+
+stock GMX_GetTime() {
+	return get_systime(0)  + GMX_GetServerTimeDiff();
+}
