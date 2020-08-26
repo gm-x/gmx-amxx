@@ -258,8 +258,8 @@ public CmdReloadConfig(id, level) {
 
 public CmdAssign(id) {
 	new Float:gametime = get_gametime();
-	if(gametime < Players[id][PlayerFloodTime] + CMD_DELAY) {
-		if(++Players[id][PlayerAttemptsCount] >= ATTEMPTS_COUNT) {
+	if (gametime < Players[id][PlayerFloodTime] + CMD_DELAY) {
+		if (++Players[id][PlayerAttemptsCount] >= ATTEMPTS_COUNT) {
 			console_print(id, "Stop flooding the server by sending a command!");
 			return PLUGIN_HANDLED;
 		}
@@ -268,7 +268,7 @@ public CmdAssign(id) {
 	}
 	Players[id][PlayerFloodTime] = gametime;
 
-	if(Players[id][PlayerStatus] == STATUS_LOADED && Players[id][PlayerId]) {
+	if (Players[id][PlayerStatus] == STATUS_LOADED && Players[id][PlayerId]) {
 		console_print(id, "Access has already been granted!");
 		return PLUGIN_HANDLED;
 	}
@@ -289,7 +289,7 @@ public CmdAssign(id) {
 public OnInfoResponse(const GmxResponseStatus:status, GripJSONValue:data) {
 	if (status == GmxResponseStatusBadToken) {
 		ApiEnabled = false;
-		logToFile(GmxLogError, "Bad token. Change valid in gmx.json and reload config");
+		logToFile(GmxLogError, "Bad token. Change to a valid one in gmx.json and reload the config");
 		return;
 	}
 
@@ -351,7 +351,7 @@ public OnConnected(const GmxResponseStatus:status, GripJSONValue:data, const use
 public OnPing(const GmxResponseStatus:status, GripJSONValue:data) {
 	if (status == GmxResponseStatusBadToken) {
 		ApiEnabled = false;
-		logToFile(GmxLogError, "Bad token. Change valid in gmx.json and reload config");
+		logToFile(GmxLogError, "Bad token. Change to a valid one in gmx.json and reload the config");
 		return;
 	}
 
@@ -512,18 +512,18 @@ loadConfig() {
 	get_localinfo("amxx_configsdir", filePath, charsmax(filePath));
 	add(filePath, charsmax(filePath), "/gmx.json");
 	if (!file_exists(filePath)) {
-		set_fail_state("Coudn't open %s", filePath);
+		set_fail_state("Could not open %s", filePath);
 	}
 
 	new error[128];
 	new GripJSONValue:cfg = grip_json_parse_file(filePath, error, charsmax(error));
 	if (cfg == Invalid_GripJSONValue) {
-		set_fail_state("Coudn't open %s. Error %s", filePath, error);
+		set_fail_state("Could not open %s. Error %s", filePath, error);
 	}
 
 	if (grip_json_get_type(cfg) != GripJSONObject) {
 		grip_destroy_json_value(cfg);
-		set_fail_state("Coudn't open %s. Bad format", filePath);
+		set_fail_state("Could not open %s. Bad format", filePath);
 	}
 
 	grip_json_object_get_string(cfg, "token", Token, charsmax(Token));
@@ -531,7 +531,7 @@ loadConfig() {
 	LogLvl = GmxLogLevel:grip_json_object_get_number(cfg, "loglevel");
 	grip_destroy_json_value(cfg);
 
-	logToFile(GmxLogInfo, "Load configuration. URL is '%s'", Url);
+	logToFile(GmxLogInfo, "Loading configuration. URL is '%s'", Url);
 
 	new fwd = CreateMultiForward("GMX_CfgLoaded", ET_IGNORE);
 	new ret;
@@ -773,24 +773,24 @@ public NativeGetImmunity(const plugin, const argc) {
 
 checkAPIVersion() {
 	for(new i, n = get_pluginsnum(), status[2], func; i < n; i++) {
-		if(i == PluginId) {
+		if (i == PluginId) {
 			continue;
 		}
 
 		get_plugin(i, .status = status, .len5 = charsmax(status));
 
 		//status debug || status running
-		if(status[0] != 'd' && status[0] != 'r') {
+		if (status[0] != 'd' && status[0] != 'r') {
 			continue;
 		}
 	
 		func = get_func_id("__gmx_version_check", i);
 
-		if(func == -1) {
+		if (func == -1) {
 			continue;
 		}
 
-		if(callfunc_begin_i(func, i) == 1) {
+		if (callfunc_begin_i(func, i) == 1) {
 			callfunc_push_int(GMX_MAJOR_VERSION);
 			callfunc_push_int(GMX_MINOR_VERSION);
 			callfunc_end();

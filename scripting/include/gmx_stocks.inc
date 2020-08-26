@@ -4,6 +4,13 @@
 
 #define _gmx_stocks_included
 
+/**
+ * Returns client index if user id is found.
+ *
+ * @param userid    User id to find
+ *
+ * @return          Client index, or 0 if not ofund
+ */
 stock GMX_GetPlayerByUserID(const userid) {
 	for (new id = 1; id <= MaxClients; id++) {
 		if (is_user_connected(id) && get_user_userid(id) == userid) {
@@ -14,6 +21,13 @@ stock GMX_GetPlayerByUserID(const userid) {
 	return 0;
 }
 
+/**
+ * Returns client index if player id is found.
+ *
+ * @param playerid   User id to find
+ *
+ * @return           Client index, or 0 if not found
+ */
 stock GMX_GetPlayerByPlayerID(const playerid) {
 	for (new id = 1; id <= MaxClients; id++) {
 		if (is_user_connected(id) && GMX_PlayerIsLoaded(id) && GMX_PlayerGetPlayerId(id) == playerid) {

@@ -15,7 +15,7 @@
 forward GMX_CfgLoaded();
 
 /**
- * Description.
+ * Called when GM-X is initiated.
  *
  * @noreturn
  */
@@ -164,7 +164,7 @@ native GMX_PlayerGetSessionId(const id);
 native GMX_PlayerGetImmunity(const id);
 
 /*
-* This is callback from GMX Core that gives major/minor versions for verifying compatibility for GMX versions.
+* This is callback from GM-X Core that gives major/minor versions for verifying compatibility for GM-X versions.
 * Do not modify this!
 */
 public __gmx_version_check(const majorVersion, const minorVersion) {
